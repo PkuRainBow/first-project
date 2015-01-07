@@ -1,12 +1,16 @@
 #include "VideoAbstraction.h"
 #include "UserVideoAbstraction.h"
 
-UserVideoAbstraction::UserVideoAbstraction(const char* inputpath, const char* videoname,const  char* midname)
+UserVideoAbstraction::UserVideoAbstraction(const char* inputpath, const char* out_path, const char* log_path, const char* config_path,const char* index_path,const char* videoname, const char* midname)
 {
 	string t1=inputpath;
-	string t2=videoname;
-	string t3=midname;
-	userVB =new VideoAbstraction(t1,t2,t3);
+	string t2=out_path;
+	string t3=log_path;
+	string t4=config_path;
+	string t5=index_path;
+	string t6=videoname;
+	string t7=midname;
+	userVB =new VideoAbstraction(t1,t2,t3,t4,t5,t6,t7);
 }
 
 UserVideoAbstraction::UserVideoAbstraction(){};

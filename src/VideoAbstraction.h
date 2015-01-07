@@ -42,7 +42,7 @@ struct ObjectCube{
 
 class VideoAbstraction{
 public:
-	VideoAbstraction(string inputpath, string videoname, string midname);
+	VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname);
 	VideoAbstraction();
 	void init();
 	//~VideoAbstraction();
@@ -68,8 +68,13 @@ public:
 	Mat backgroundImage;				//存储 混合高斯模型提取出的 背景信息------分割程序运行的第二步需要操作的部分
 	Mat currentStartIndex,currentEndIndex;
 
+	//path string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname
 	string Inputpath;					//处理的视频的路径、名字、中间文件的名字
 	string Outpath;					//处理后的视频输出路径
+	string Logpath;
+	string Configpath;
+	string Indexpath;
+	//name
 	string InputName;					//输入的视频文件的名字
 	string MidName;					//配置文件/凸包 文件名
 	string OutputName;

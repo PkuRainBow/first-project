@@ -1,9 +1,13 @@
 ﻿#include "VideoAbstraction.h"
 //
-VideoAbstraction::VideoAbstraction(string inputpath, string videoname, string midname){
+VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname){
 	objectarea=60;
 	useGpu=true;
 	Inputpath=inputpath;
+	Outpath=out_path;
+	Logpath=log_path;
+	Configpath=config_path;
+	Indexpath=index_path;
 	InputName=videoname;
 	MidName=midname;
 	videoCapture.open(inputpath+videoname);
@@ -426,7 +430,7 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 
 void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前背景分离函数
 	if(frameIndex==30)								//如果中间文件原来已经存在，则执行清空操作
-		ofstream file_flush(Inputpath+MidName, ios::trunc);
+		ofstream file_flush(Configpath+MidName, ios::trunc);
 
 	if(frameIndex <= 30){							//初始化混合高斯 取前50帧图像来更新背景信息  提示：取值50仅供参考，并非必须是50
 		if(useGpu){
@@ -529,7 +533,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 void VideoAbstraction::saveObjectCube(ObjectCube &ob){			//保存运动的凸包序列的函数
 	frame_start.push_back(ob.start);						//保存凸包的开始帧号
 	frame_end.push_back(ob.end);							//保存凸包的结束帧号
-	ofstream ff(Inputpath+MidName, ofstream::app);
+	ofstream ff(Configpath+MidName, ofstream::app);
 	for(int i=ob.start,j=0;i<=ob.end;++i,++j){
 		Mat tmp=vectorToMat(ob.objectMask[j],frameHeight,frameWidth);
 		vector<vector<Point>> contors;
@@ -542,7 +546,7 @@ void VideoAbstraction::saveObjectCube(ObjectCube &ob){			//保存运动的凸包
 }
 
 void VideoAbstraction::saveConfigInfo(){						//保存所有凸包运动序列的开始和结束帧信息
-	ofstream ff(Inputpath+MidName, ofstream::app);
+	ofstream ff(Configpath+MidName, ofstream::app);
 	int size = frame_start.size();
 	for(int i=0; i<size; i++){
 		ff<<endl;
@@ -553,7 +557,7 @@ void VideoAbstraction::saveConfigInfo(){						//保存所有凸包运动序列�
 }
 
 void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指定帧序列号范围内的运动帧导入 partToCompound 中
-	ifstream file(Inputpath+MidName);
+	ifstream file(Configpath+MidName);
 	string temp;
 	for(int i=0; i<loadIndex; i++) {
 		getline(file, temp, '#');
@@ -584,7 +588,7 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 }
 
 void  VideoAbstraction::LoadConfigInfo(){		//不能分阶段处理 -- 读取中间文件中的运动起始信息
-	ifstream file(Inputpath+MidName);
+	ifstream file(Configpath+MidName);
 	string temp;
 	for(int i=0; i<ObjectCubeNumber; i++) {		
 		getline(file, temp, '#');
@@ -603,7 +607,7 @@ void  VideoAbstraction::LoadConfigInfo(){		//不能分阶段处理 -- 读取中�
 
 void  VideoAbstraction::LoadConfigInfo(int frameCountUsed){  //用于分阶段处理 ---  需要传入有效帧的帧数信息
 	this->ObjectCubeNumber=frameCountUsed;
-	ifstream file(Inputpath+MidName);
+	ifstream file(Configpath+MidName);
 	string temp;
 	for(int i=0; i<ObjectCubeNumber; i++) {	
 		getline(file, temp, '#');
@@ -667,31 +671,6 @@ vector<vector<Point>> VideoAbstraction::stringToContors(string ss){
 	return contors;
 }
 
-void VideoAbstraction::on_mouse(int event, int x, int y, int flags, void* param){
-	VideoAbstraction* temp=(VideoAbstraction*)param;
-	int begin,end;
-	begin=temp->currentStartIndex.at<unsigned short>(y,x);
-	end=temp->currentEndIndex.at<unsigned short>(y,x);
-	if(end-begin&&event == CV_EVENT_LBUTTONDOWN){
-		cout<<begin<<"\t"<<end<<endl;
-		Mat cur_frame;
-		VideoCapture vc;
-		vc.open(temp->Inputpath);
-		vc.set(CV_CAP_PROP_POS_FRAMES,begin-1);
-		namedWindow("索引");
-		for(int i=begin;i<end;i++){
-			//cur_frame=imread(temp->frameSavePath+"frame"+temp->int2string(i)+".pgm",CV_LOAD_IMAGE_COLOR);
-			vc>>cur_frame;
-			imshow("索引",cur_frame);
-			int key=waitKey(1);
-			if(key==32){
-				break;
-			}
-		}
-		destroyWindow("索引");
-	}
-
-}
 
 int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int step/* =5 */){  //计算所有运动序列的最佳偏移序列组合
 
@@ -772,18 +751,17 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 }
 
 void VideoAbstraction::compound(string path){	
-	//合成运动序列的函数
-	ofstream indexfile(Inputpath+"IndexLog.txt", ofstream::app);
 	int testcount=0;
 	Outpath=path;									//获取合成文件的输出路径以及完整的文件名字
 	videoCapture.open(Inputpath+InputName);			//合成操作前，需要提取背景图片信息保存到backgroundImage中
 	backgroundImage=imread("background.jpg");
-
-	int ex = static_cast<int>(videoCapture.get(CV_CAP_PROP_FOURCC));
-	char EXT[] = {(char)(ex & 0XFF) , (char)((ex & 0XFF00) >> 8),(char)((ex & 0XFF0000) >> 16),
-		(char)((ex & 0XFF000000) >> 24), 0};
-	string fourCC=EXT;
-	cout<<"FOURCC:"<<fourCC<<endl;
+	
+	//get the CV_CAP_PROP_FOURCC codec
+	//int ex = static_cast<int>(videoCapture.get(CV_CAP_PROP_FOURCC));
+	//char EXT[] = {(char)(ex & 0XFF) , (char)((ex & 0XFF00) >> 8),(char)((ex & 0XFF0000) >> 16),
+	//	(char)((ex & 0XFF000000) >> 24), 0};
+	//string fourCC=EXT;
+	//cout<<"FOURCC:"<<fourCC<<endl;
 
 	videoWriter.open(Outpath, (int)videoCapture.get(CV_CAP_PROP_FOURCC), 
 		(double)videoCapture.get( CV_CAP_PROP_FPS ),
@@ -994,10 +972,13 @@ void VideoAbstraction::compound(string path){
 			//	cout<<endl;
 			//}
 			testcount++;
-			
-			string filepath="D:/summarytest1/indexMat/"+InputName+"/";
-			boost::filesystem::path dir(filepath);
-			boost::filesystem::create_directories(dir);
+			string filepath=Indexpath+InputName+"/";
+			fstream testfile;
+			testfile.open(filepath, ios::in);
+			if(!testfile){
+				boost::filesystem::path dir(filepath);
+				boost::filesystem::create_directories(dir);
+			}
 			string filename=boost::lexical_cast<string>(testcount)+".jpg";
 			imwrite(filepath+filename, indexMat);
 			videoWriter.write(currentResultFrame);
@@ -1008,7 +989,6 @@ void VideoAbstraction::compound(string path){
 		zeroObject1.release();
 		oneObject.release();
 	}
-	indexfile.close();
 	videoWriter.release();			//  视频合成结束
 	LOG(INFO)<<"合成结束\n";
 	LOG(INFO)<<"合成耗时"<<clock()-starttime<<"豪秒\n";
