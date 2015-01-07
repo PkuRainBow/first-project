@@ -1,1 +1,8 @@
 cd /C/Users/admin/git/repos/VideoAbstraction
+
+
+git add .
+git status
+git commit -m "description"
+git push
+git
