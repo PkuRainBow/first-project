@@ -1,7 +1,14 @@
-﻿#include "VideoAbstraction.h"
+﻿//****************************************
+//user: PianoCoder
+//Create date:
+//Class name: VideoAbstraction
+//Discription:  implement the background/foreground subtraction and the video compounding
+//Update: 2014/01/07
+//****************************************
+#include "VideoAbstraction.h"
 //
 VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname){
-	objectarea=60;
+	objectarea=80;
 	useGpu=true;
 	Inputpath=inputpath;
 	Outpath=out_path;
@@ -94,7 +101,7 @@ void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){
 	vector<vector<Point>>::const_iterator itc=contors.begin();
 	//过滤掉过小的闭包，其他闭包全部存放到 newcontors 中
 	while(itc!=contors.end()){
-		if(itc->size()<thres){
+		if(contourArea(*itc)<thres){
 			itc=contors.erase(itc);
 		}
 		else{
@@ -461,7 +468,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 				mog(gFrame,gForegroundMask,LEARNING_RATE);
 				gForegroundMask.copyTo(currentMask);		//复制运动的凸包序列到 currentMask 中
 			}
-			ConnectedComponents(frameIndex,currentMask,objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
+			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
 			waitKey(1);
 			if(sum>1000){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
@@ -857,6 +864,7 @@ void VideoAbstraction::compound(string path){
 		sumLength+=(curMaxLength-startCompound);	
 		for(int j=startCompound;j<curMaxLength;j++)
 		{
+			int baseIndex=(earliestIndex+ss*motionToCompound)/256;
 			bool haveFrame=false;
 			Mat resultMask;
 			//初始化 indexMat
@@ -881,7 +889,7 @@ void VideoAbstraction::compound(string path){
 					uchar* pi=indexMat.ptr<uchar>(ii);
 					uchar* ptr_re=resultMask.ptr<uchar>(ii);
 					for(int jj=0; jj<indexMat.cols;jj++){
-						pi[jj]=earliestIndex+ss*motionToCompound;
+						pi[jj]=(earliestIndex+ss*motionToCompound)%256;
 						if(ptr_re[jj]==255)
 							pi[jj]=255-pi[jj];
 					}

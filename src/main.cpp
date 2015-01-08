@@ -24,6 +24,7 @@ static void bar_callback(int index,void* userdata);
 //variable definition
 string testVideoName;
 string log_path;
+string state;
 //snap-shot 
 
 VideoCapture capture;
@@ -157,7 +158,7 @@ static void mouseSnipShot(int event, int x, int y, int flags, void* userdata)
 //test=3: you can replay the seleted object's event full process
 //test=4: you can view 9 snip-shots of the original video 
 /*****************************************************************/
-void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount){
+void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int stage){
 	testVideoName=videoname;
 	//set all the necessary paths
 	string path=inputpath;
@@ -174,10 +175,11 @@ void testmultithread(const char* inputpath, const char* videoname, const char* m
 	UserVideoAbstraction* user=new UserVideoAbstraction(inputpath, (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(), (char*)index_path.data(), videoname, midname);
 	user->UsersetGpu(true);
 	user->UsersetIndex(false);
-	user->UsersetMinArea(60);
+	user->UsersetMinArea(200);
 
-	int test = 1;
+	int test = stage;
 	if(test==1){
+		state="Background/Foreground Subtraction";
 		VideoCapture capture;
 		string t1=inputpath,t2=videoname;
 		string t3 = t1+t2;
@@ -213,6 +215,7 @@ void testmultithread(const char* inputpath, const char* videoname, const char* m
 		ff.close();
 	}
 	else if(test==2){
+		state="compound the result video";
 		string t3 = out_path+outputname;
 		if(setROI){
 			int x,y;
@@ -225,6 +228,7 @@ void testmultithread(const char* inputpath, const char* videoname, const char* m
 		user->UserfreeObject();
 	}
 	else if(test==3){
+		state="test the index video function";
 		int frCount = readFrameLog(log_path+"FrameLog.txt");
 		string t1=inputpath,t2=midname,t=videoname;
 		ori_video=inputpath+t;
@@ -233,7 +237,7 @@ void testmultithread(const char* inputpath, const char* videoname, const char* m
 		string temp;
 		//读取中间文件获取 event_start event_end event_length 信息
 		ifstream file(config_path+t2);
-		for(int i=0; i<1213; i++) {		
+		for(int i=0; i<frCount; i++) {		
 			getline(file, temp, '#');
 		}
 		event_start.clear();
@@ -269,6 +273,7 @@ void testmultithread(const char* inputpath, const char* videoname, const char* m
 		}
 	}
 	else if(test==4){
+		state="test the snip-shot function";
 		namedWindow(window_name);
 		setMouseCallback(window_name,mouseSnipShot);//设置鼠标回调函数
 		SubPlot=Size(3,3);//最终快照显示图像为3*3 矩阵的九张图像
@@ -335,10 +340,10 @@ int main(){
 	/* Tong Hao Test !!! */
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "juminxiaoqu.avi", "config-0","result-0.avi", 2337, 8);
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "testvideo.avi", "config-1","result-1.avi", 1213, 8);
-	boost::thread test1(testmultithread,"D:/summarytest1/", "xiezilou.avi", "config-2","esult-2.avi", 2963, 8);
+	boost::thread test1(testmultithread,"D:/summarytest1/", "xiezilou.avi", "config-2","result-2.avi", 2963, 8, 2);
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "LOD_CIF_HQ_4_2.avi", "config-3","result-3.avi", 9146, 8);
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "gaodangxiaoqu.avi", "config-4","result-4.avi", 2337, 8);  // no video
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "road.avi", "config-5","result-5.avi", 6205, 8);
+	//boost::thread test1(testmultithread,"D:/summarytest1/", "road.avi", "config-5","result-5.avi", 6205, 8, 3);
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "loumenkou.avi", "config-6","result-6.avi", 26335, 8);
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "damenkou.avi", "config-7","result-7.avi", 16930, 8);
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "an.avi", "config-8","result-8.avi", 34614, 8);
@@ -347,14 +352,10 @@ int main(){
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "20111202_082713.avi", "config-11","result-11.avi", 34614, 8);
 
 	test1.join();
-
 	cout<<"finished..."<<endl;
 	end_time=time(NULL);
-	//ofstream ff("F:/VideoAbVideoSet/TimeLog.txt", ofstream::app);
 	ofstream ff(log_path+"TimeLog.txt", ofstream::app);
-	ff<<time(NULL)<<"\t"<<testVideoName<<"\t video abstraction time: "<<end_time-start_time<<endl;
-	//ofstream ff("f:/count_config.txt", ofstream::app);
-	//ff<<"video abstraction time: "<<end_time-start_time<<endl;
+	ff<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<endl;
 	getchar();
 	return 0;
 }

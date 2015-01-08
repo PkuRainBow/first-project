@@ -15,15 +15,11 @@
 #include <boost/thread/thread.hpp>
 #include "boost/filesystem.hpp"
 #include <boost/lexical_cast.hpp>
-
-//debug info ...
-
 /*
  *Boost Filesystem库提供了对路径、文件和目录进行查询和操作提供了可一直的工具 所有的内容都处于名空间 boost::filesystem 中
  * boost::lexical_cast<string>(i)  把（）中的数据类型转变成< >中的数据类型
  */
 namespace fs = boost::filesystem;
-//#include <bitset>
 
 #define CV_CVX_WHITE    CV_RGB(0xff,0xff,0xff)
 #define CV_CVX_BLACK    CV_RGB(0x00,0x00,0x00)
