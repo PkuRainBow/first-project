@@ -1,7 +1,15 @@
 cd /C/Users/admin/git/repos/VideoAbstraction
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> b8e09ded969b72ff7a5260e640fc391f935624ed
 git add .
 git status
 git commit -m "description"
 git push
+<<<<<<< HEAD
 git
+=======
+git
+>>>>>>> b8e09ded969b72ff7a5260e640fc391f935624ed
