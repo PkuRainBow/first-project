@@ -90,10 +90,13 @@ void VideoAbstraction::postProc(Mat& frame){
 void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){  
 	//GaussianBlur(mask,mask,Size(5,5),0,0);
 	//GaussianBlur(mask,mask,Size(5,5),0,0);
-	Mat ele(2,2,CV_8U,Scalar(1));
+	//imshow("erode1",mask);
+	Mat ele(2,4,CV_8U,Scalar(1));
 	erode(mask,mask,ele);// 默认时，ele 为 cv::Mat() 形式  参数扩展（image， eroded, structure, cv::Point(-1,-1,), 3） 
 	//右侧2个参数分别表示 是从矩阵的中间开始，3表示执行3次同样的腐蚀操作
 	dilate(mask,mask,ele);
+	//imshow("erode2",mask);
+	//waitKey(0);
 
 	vector<vector<Point>> contors,newcontors;
 	vector<Point> hull;
@@ -103,6 +106,7 @@ void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){
 	//过滤掉过小的闭包，其他闭包全部存放到 newcontors 中
 	while(itc!=contors.end()){
 		if(contourArea(*itc)<thres){
+		//if(itc->size()<thres){
 			itc=contors.erase(itc);
 		}
 		else{
@@ -175,7 +179,7 @@ void VideoAbstraction::stitch(Mat &input1,Mat &input2,Mat &output,Mat &back,Mat 
 		vector<vector<Point>>::const_iterator itc=m_contours.begin();
 
 		while(itc!=m_contours.end()){
-			if(itc->size() < objectarea){
+			if(contourArea(*itc) < objectarea){
 				itc=m_contours.erase(itc);
 			}
 			else{
@@ -436,17 +440,17 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 }
 
 
-void VideoAbstraction::Abstraction(Mat& inputFrame, int frameIndex){	  //前背景分离函数
-	Mat currentFrame;
-	if(scaleSize > 1)
-		pyrDown(inputFrame, currentFrame, Size(frameWidth,frameHeight));
-	else
-		inputFrame.copyTo(currentFrame);
+void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前背景分离函数
+	//Mat currentFrame;
+	//if(scaleSize > 1)
+	//	pyrDown(inputFrame, currentFrame, Size(frameWidth,frameHeight));
+	//else
+	//	inputFrame.copyTo(currentFrame);
 
-	if(frameIndex==30)								//如果中间文件原来已经存在，则执行清空操作
+	if(frameIndex==50)								//如果中间文件原来已经存在，则执行清空操作
 		ofstream file_flush(Configpath+MidName, ios::trunc);
 
-	if(frameIndex <= 30){							//初始化混合高斯 取前50帧图像来更新背景信息  提示：取值50仅供参考，并非必须是50
+	if(frameIndex <= 50){							//初始化混合高斯 取前50帧图像来更新背景信息  提示：取值50仅供参考，并非必须是50
 		if(useGpu){
 			//gpu module
 			gpuFrame.upload(currentFrame);
@@ -463,7 +467,7 @@ void VideoAbstraction::Abstraction(Mat& inputFrame, int frameIndex){	  //前背�
 		imwrite("background.jpg",backgroundImage);
 	}
 	else{										//50帧之后的图像需要正常处理
-		if(frameIndex%3==0){						//更新前背景信息的频率，表示每5帧做一次前背景分离
+		if(frameIndex%5==0){						//更新前背景信息的频率，表示每5帧做一次前背景分离
 			if(useGpu){
 				//gpu module
 				gpuFrame.upload(currentFrame);
@@ -477,9 +481,8 @@ void VideoAbstraction::Abstraction(Mat& inputFrame, int frameIndex){	  //前背�
 			}
 			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
-			waitKey(1);
 			//整个画面
-			if(sum>1000){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
+			if(sum>thres){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				flag=true;
 			}
 		}
@@ -495,13 +498,13 @@ void VideoAbstraction::Abstraction(Mat& inputFrame, int frameIndex){	  //前背�
 			if(sum<thres){				   //当前图像中无运动序列
 				if(noObjectCount>=15){														//已经有连续15帧无运动序列，运动结束  存储运动序列
 					currentObject.end=frameIndex-15;
-					if(currentObject.end-currentObject.start>30){								//运动序列长度大于 50 才认为是有效运动，否则不认为其是运动的
+					if(currentObject.end-currentObject.start>1){								//运动序列长度大于 50 才认为是有效运动，否则不认为其是运动的
 						detectedMotion++;
 						currentLength=currentObject.end-currentObject.start+1;
 						if(currentLength>maxLengthToSpilt*10){								//运动序列的长度太长，是无意义的运动序列，直接丢弃
 							detectedMotion--;
 						} 
-						else if(currentLength>maxLengthToSpilt*2){							//事件过长 进行切分处理
+						else if(currentLength>maxLengthToSpilt*5){							//事件过长 进行切分处理
 							LOG(INFO)<<"事件过长:"<<currentLength<<endl;
 							int spilt=currentLength/maxLengthToSpilt+1;
 							int spiltLength=currentLength/spilt;
@@ -841,6 +844,10 @@ void VideoAbstraction::compound(string path){
 		LOG(INFO)<<"时间偏移计算耗时"<<clock()-starttime<<"豪秒\n";
 		LOG(INFO)<<"开始合成"<<endl;
 
+		//zeroobject
+		//currentStartIndex=zeroObject1.clone();
+		//currentEndIndex=zeroObject1.clone();
+
 		starttime=clock();
 		Mat currentFrame;
 		Mat currentResultFrame;
@@ -861,6 +868,10 @@ void VideoAbstraction::compound(string path){
 			Mat resultMask;
 			//初始化 indexMat
 			Mat indexMat(Size(frameWidth,frameHeight), CV_8U);
+
+			//bitwise_and(currentStartIndex,zeroObject1,currentStartIndex);
+			//bitwise_and(currentEndIndex,zeroObject1,currentStartIndex);
+
 			int earliest=INT_MIN,earliestIndex=-1;
 			for(int i=0;i<synopsis;i++){	//寻找序列中开始时间最早的作为背景
 				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j){
@@ -892,10 +903,11 @@ void VideoAbstraction::compound(string path){
 					uchar* pi=indexMat.ptr<uchar>(ii);
 					uchar* ptr_re=resultMask.ptr<uchar>(ii);
 					for(int jj=0; jj<indexMat.cols;jj++){
-						//pi[jj]=(earliestIndex+ss*motionToCompound)%256;
-						pi[jj]=remainIndex;
+						pi[jj]=(earliestIndex+ss*motionToCompound)%256;
+						//pi[jj]=remainIndex;
 						if(ptr_re[jj]==255)
 							pi[jj]=255-pi[jj];
+							//pi[jj]=remainIndex;
 					}
 				}
 			}
@@ -922,6 +934,13 @@ void VideoAbstraction::compound(string path){
 					Mat currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
 					writeMask(currentMask, indexMat, (i+ss*motionToCompound)%256);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
+
+					//zeroobject
+					//bitwise_and(currentStartIndex,zeroObject1,currentStartIndex,currentMask);
+					//bitwise_and(currentEndIndex,zeroObject1,currentEndIndex,currentMask); 
+					//add(currentStartIndex,partToCompound[i].start,currentStartIndex,currentMask);
+					//add(currentEndIndex,partToCompound[i].end,currentEndIndex,currentMask);
+
 					currentMask.release();
 				}
 			}
@@ -982,6 +1001,8 @@ void VideoAbstraction::compound(string path){
 		}
 		currentFrame.release();
 		currentResultFrame.release();
+
+		//zeroobject
 		//zeroObject.release();
 		//zeroObject1.release();
 		//oneObject.release();
@@ -1012,6 +1033,7 @@ void VideoAbstraction::writeMask(Mat& input, Mat& output, int index){
 		for(int jj=0; jj<input.cols;jj++){
 			if(ptr_input[jj]==255)
 				ptr_output[jj]=255-index;
+				//ptr_output[jj]=index;
 		}
 	}
 }

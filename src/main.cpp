@@ -109,6 +109,7 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 			p=destmat.ptr<uchar>(i);
 			for(int j=0; j<destmat.cols; j++){
 				if((int)p[j] > 100)	event_count[255-(int)p[j]]++;
+				//if((int)p[j] > 100)	event_count[(int)p[j]]++;
 			}
 		}
 		for(int i=0; i<MAX_INDEX_COUNT; i++){
@@ -163,7 +164,12 @@ static void mouseSnipShot(int event, int x, int y, int flags, void* userdata)
 //test=3: you can replay the seleted object's event full process
 //test=4: you can view 9 snip-shots of the original video 
 /*****************************************************************/
-void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int scale, int stage){
+void testmultithread(string inputpath, string videoname, string midname, string outputname, int frameCount, int CompoundCount, int scale, int stage){
+//void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int scale, int stage){
+	time_t start_time,end_time;
+	
+	start_time=time(NULL);
+
 	testVideoName=videoname;
 	//set all the necessary paths
 	string path=inputpath;
@@ -177,12 +183,14 @@ void testmultithread(const char* inputpath, const char* videoname, const char* m
 	create_path(config_path);
 	create_path(index_path);
 	
-	UserVideoAbstraction* user=new UserVideoAbstraction(inputpath, (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(), (char*)index_path.data(), videoname, midname, scale);
+	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
+														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
 	user->UsersetGpu(true);
 	user->UsersetIndex(false);
 	user->UsersetMinArea(MIN_AREA);
-
+	
 	int test = stage;
+	ofstream ff(log_path+"TimeLog.txt", ofstream::app);
 	if(test==1){
 		state="Background/Foreground Subtraction";
 		VideoCapture capture;
@@ -317,51 +325,33 @@ void testmultithread(const char* inputpath, const char* videoname, const char* m
 	else{
 		//check or debug 
 	}
+	end_time=time(NULL);
+	ff<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<endl;
 }
 
 
 int main(){
 	// boost thread control ...
-	time_t start_time,end_time;
-	start_time=time(NULL);
-
-	/*Basic  Test !!! */
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "1hour_sample.avi", "config-1","result-1.avi", 44597, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "AA014303.avi", "config-2","result-2.avi", 2766, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "AA014403.avi", "config-3","result-3.avi", 756, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "camera2_2013510175011.mp4", "config-4","f:/VideoAbVideoSet/output/result-4.avi", 1306, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "lena_in_1_clip.avi", "config-5","f:/VideoAbVideoSet/output/result-5.avi", 100, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "MVI_0678_Compress.avi", "config-6","f:/VideoAbVideoSet/output/result-6.avi", 14006, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "MVI_0682_Compress_clip.avi", "config-7","f:/VideoAbVideoSet/output/result-7.avi", 4498, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "MVI_0683_Compress_clip.avi", "config-8","f:/VideoAbVideoSet/output/result-8.avi", 12540, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "test1.avi", "config-9","f:/VideoAbVideoSet/output/result-9.avi", 400, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/input/", "test2.avi", "config-10","f:/VideoAbVideoSet/output/result-10.avi", 1806, 8);
-
-	//resize the No D1-Video -------> D1-Video
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/", "AA012507.mp4", "config-6","f:/VideoAbVideoSet/AA01.avi", 14006, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/", "AA012507.avi", "config-AA012507","f:/VideoAbVideoSet/result-AA012507_ROI.avi", 2332, 8);
-	//boost::thread test1(testmultithread,"F:/VideoAbVideoSet/", "AA013102.avi", "config-AA013102","f:/VideoAbVideoSet/result-AA013102.avi", 2332, 8);
+	
+	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi", "gaodangxiaoqu.avi", 
+						"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
+						"Cam3.avi", "Cam4.avi", "Cam5.avi"};
 
 	/* Tong Hao Test !!! */
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "juminxiaoqu.avi", "config-0","result-0.avi", 2337, 8);
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "testvideo.avi", "config-1","result-1.avi", 1213, 8, 1, 3);
-	boost::thread test1(testmultithread,"D:/summarytest1/", "xiezilou.avi", "config-2","result-2.avi", 2963, 8, 1, 1);
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "LOD_CIF_HQ_4_2.avi", "config-3","result-3.avi", 9146, 8);
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "gaodangxiaoqu.avi", "config-4","result-4.avi", 2337, 8);  // no video
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "road.avi", "config-5","result-5.avi", 6205, 8, 3);
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "loumenkou.avi", "config-6","result-6.avi", 26335, 8);
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "damenkou.avi", "config-7","result-7.avi", 16930, 8);
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "an.avi", "config-8","result-8.avi", 34614, 8);
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "20111201_144857.avi", "config-9","result-9.avi", 2337, 8);  //20s length
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "20111201_170301.avi", "config-10","result-10.avi", 45460, 8); 
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "20111202_082713.avi", "config-11","result-11.avi", 34614, 8);
-
-	test1.join();
-	cout<<"finished..."<<endl;
-	end_time=time(NULL);
-	ofstream ff(log_path+"TimeLog.txt", ofstream::app);
-	ff<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<endl;
-	getchar();
+	for(int i=0; i<testset1->size(); i++){	
+		string result_name="result_"+testset1[i];
+		string config_name="config_"+testset1[i];
+		boost::thread test1(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, 6205, 8, 1, 1);
+		test1.join();
+		cout<<"finished..."<<endl;
+	}
+	for(int i=0; i<testset1->size(); i++){	
+		string result_name="result_"+testset1[i];
+		string config_name="config_"+testset1[i];
+		boost::thread test2(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, 6205, 8, 1, 2);
+		test2.join();
+		cout<<"finished..."<<endl;
+	}
 	return 0;
 }
 
