@@ -1,7 +1,7 @@
 #include "VideoAbstraction.h"
 #include "UserVideoAbstraction.h"
 
-UserVideoAbstraction::UserVideoAbstraction(const char* inputpath, const char* out_path, const char* log_path, const char* config_path,const char* index_path,const char* videoname, const char* midname)
+UserVideoAbstraction::UserVideoAbstraction(const char* inputpath, const char* out_path, const char* log_path, const char* config_path,const char* index_path,const char* videoname, const char* midname, int scale)
 {
 	string t1=inputpath;
 	string t2=out_path;
@@ -10,7 +10,7 @@ UserVideoAbstraction::UserVideoAbstraction(const char* inputpath, const char* ou
 	string t5=index_path;
 	string t6=videoname;
 	string t7=midname;
-	userVB =new VideoAbstraction(t1,t2,t3,t4,t5,t6,t7);
+	userVB =new VideoAbstraction(t1,t2,t3,t4,t5,t6,t7,scale);
 }
 
 UserVideoAbstraction::UserVideoAbstraction(){};
@@ -73,5 +73,5 @@ void UserVideoAbstraction::UsersetIndex(bool isindex){
 }
 
 void UserVideoAbstraction::UsersetMinArea(int minarea){
-	userVB->objectarea=minarea;
+	userVB->objectarea=minarea/userVB->scaleSize;
 }

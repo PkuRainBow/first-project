@@ -7,8 +7,9 @@
 //****************************************
 #include "VideoAbstraction.h"
 //
-VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname){
-	objectarea=80;
+VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname, int size){
+	scaleSize=size;
+	objectarea=100/scaleSize;
 	useGpu=true;
 	Inputpath=inputpath;
 	Outpath=out_path;
@@ -18,8 +19,8 @@ VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log
 	InputName=videoname;
 	MidName=midname;
 	videoCapture.open(inputpath+videoname);
-	frameHeight=videoCapture.get(CV_CAP_PROP_FRAME_HEIGHT);
-	frameWidth=videoCapture.get(CV_CAP_PROP_FRAME_WIDTH);
+	frameHeight=videoCapture.get(CV_CAP_PROP_FRAME_HEIGHT)/scaleSize;
+	frameWidth=videoCapture.get(CV_CAP_PROP_FRAME_WIDTH)/scaleSize;
 	framePerSecond=videoCapture.get(CV_CAP_PROP_FPS);
 	useROI=false;
 	init();
@@ -435,7 +436,13 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 }
 
 
-void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前背景分离函数
+void VideoAbstraction::Abstraction(Mat& inputFrame, int frameIndex){	  //前背景分离函数
+	Mat currentFrame;
+	if(scaleSize > 1)
+		pyrDown(inputFrame, currentFrame, Size(frameWidth,frameHeight));
+	else
+		inputFrame.copyTo(currentFrame);
+
 	if(frameIndex==30)								//如果中间文件原来已经存在，则执行清空操作
 		ofstream file_flush(Configpath+MidName, ios::trunc);
 
@@ -456,7 +463,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 		imwrite("background.jpg",backgroundImage);
 	}
 	else{										//50帧之后的图像需要正常处理
-		if(frameIndex%5==0){						//更新前背景信息的频率，表示每5帧做一次前背景分离
+		if(frameIndex%3==0){						//更新前背景信息的频率，表示每5帧做一次前背景分离
 			if(useGpu){
 				//gpu module
 				gpuFrame.upload(currentFrame);
@@ -471,6 +478,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
 			waitKey(1);
+			//整个画面
 			if(sum>1000){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				flag=true;
 			}
@@ -762,31 +770,15 @@ void VideoAbstraction::compound(string path){
 	Outpath=path;									//获取合成文件的输出路径以及完整的文件名字
 	videoCapture.open(Inputpath+InputName);			//合成操作前，需要提取背景图片信息保存到backgroundImage中
 	backgroundImage=imread("background.jpg");
-	
-	//get the CV_CAP_PROP_FOURCC codec
-	//int ex = static_cast<int>(videoCapture.get(CV_CAP_PROP_FOURCC));
-	//char EXT[] = {(char)(ex & 0XFF) , (char)((ex & 0XFF00) >> 8),(char)((ex & 0XFF0000) >> 16),
-	//	(char)((ex & 0XFF000000) >> 24), 0};
-	//string fourCC=EXT;
-	//cout<<"FOURCC:"<<fourCC<<endl;
 
 	videoWriter.open(Outpath, (int)videoCapture.get(CV_CAP_PROP_FOURCC), 
 		(double)videoCapture.get( CV_CAP_PROP_FPS ),
-		cv::Size(frameWidth, frameHeight),
+		cv::Size(frameWidth*scaleSize, frameHeight*scaleSize),
 		true );								  //输出视频的属性信息和输入视频的信息完全相同
 	if (!videoWriter.isOpened()){
 		LOG(ERROR) <<"Can't create output video file: "<<Outpath<<endl;
 		return;
 	}
-
-	//indexWriter.open(Outpath, CV_FOURCC_PROMPT, 
-	//	(double)videoCapture.get( CV_CAP_PROP_FPS ),
-	//	cv::Size(frameWidth, frameHeight),
-	//	false );								  //输出视频的属性信息和输入视频的信息完全相同
-	//if (!indexWriter.isOpened()){
-	//	LOG(ERROR) <<"Can't create output video file: "<<Outpath<<endl;
-	//	return;
-	//}
 
 	int ObjectCount = frame_start.size();				//获取运动序列的个数
 	int AverageCount = ObjectCount/motionToCompound;		//每次合成motionToCompound个运动序列的时候，合成的循环的执行次数
@@ -819,7 +811,7 @@ void VideoAbstraction::compound(string path){
 
 		vector<int> shift(synopsis,0);							//运动序列的偏移数组
 		int min=INT_MAX,cur_collision=0;						
-		Mat zeroObject(frameHeight,frameWidth,CV_8U,Scalar::all(0)),zeroObject1(frameHeight,frameWidth,CV_16U,Scalar::all(0)),oneObject(frameHeight,frameWidth,CV_16U,Scalar::all(1));
+		//Mat zeroObject(frameHeight,frameWidth,CV_8U,Scalar::all(0)),zeroObject1(frameHeight,frameWidth,CV_16U,Scalar::all(0)),oneObject(frameHeight,frameWidth,CV_16U,Scalar::all(1));
 		LOG(INFO)<<"开始计算shift"<<endl;
 		clock_t starttime=clock();
 		vector<int> tmpshift;
@@ -852,6 +844,7 @@ void VideoAbstraction::compound(string path){
 		starttime=clock();
 		Mat currentFrame;
 		Mat currentResultFrame;
+		Mat tempFrame;
 		for(int i=0;i<synopsis;i++){
 			cout<<"shift "<<i+1<<"\t"<<shift[i]<<endl;
 		}
@@ -864,7 +857,6 @@ void VideoAbstraction::compound(string path){
 		sumLength+=(curMaxLength-startCompound);	
 		for(int j=startCompound;j<curMaxLength;j++)
 		{
-			int baseIndex=(earliestIndex+ss*motionToCompound)/256;
 			bool haveFrame=false;
 			Mat resultMask;
 			//初始化 indexMat
@@ -878,10 +870,21 @@ void VideoAbstraction::compound(string path){
 					}
 				}
 			}
+
+			int baseIndex, remainIndex; 
 			if(earliestIndex>-1){
+				baseIndex=(earliestIndex+ss*motionToCompound)/256;
+				remainIndex=(earliestIndex+ss*motionToCompound)%256;
 				haveFrame=true;
 				videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[earliestIndex].start-1+j-shift[earliestIndex]);
-				videoCapture>>currentFrame;
+				//resize
+				//videoCapture>>currentFrame;
+				videoCapture>>tempFrame;
+				if(scaleSize > 1)		
+					pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
+				else
+					tempFrame.copyTo(currentFrame);
+				//resize
 				currentResultFrame=currentFrame.clone();
 				resultMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);	
 				for(int ii=0; ii<indexMat.rows; ii++)
@@ -889,7 +892,8 @@ void VideoAbstraction::compound(string path){
 					uchar* pi=indexMat.ptr<uchar>(ii);
 					uchar* ptr_re=resultMask.ptr<uchar>(ii);
 					for(int jj=0; jj<indexMat.cols;jj++){
-						pi[jj]=(earliestIndex+ss*motionToCompound)%256;
+						//pi[jj]=(earliestIndex+ss*motionToCompound)%256;
+						pi[jj]=remainIndex;
 						if(ptr_re[jj]==255)
 							pi[jj]=255-pi[jj];
 					}
@@ -900,35 +904,27 @@ void VideoAbstraction::compound(string path){
 				cout<<"没有找到最早\n";
 				break;
 			}
+
 			for(int i=0;i<synopsis;i++){
 				if(i==earliestIndex){
 					continue;
 				}
 				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j){
 					videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[i].start-1+j-shift[i]); //设置背景图片
-					videoCapture>>currentFrame;
+					//resize
+					//videoCapture>>currentFrame;
+					videoCapture>>tempFrame;
+					if(scaleSize > 1)		
+						pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
+					else
+						tempFrame.copyTo(currentFrame);
+					//resize
 					Mat currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
-					writeMask(currentMask, indexMat, i+ss*motionToCompound);
+					writeMask(currentMask, indexMat, (i+ss*motionToCompound)%256);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
 				}
 			}
-			//check
-			//if(testcount==149){
-			//	int count_check[20];
-			//	for(int i=0; i< 20; i++) count_check[i]=0;			
-			//	for(int ii=0; ii<indexMat.rows; ii++)
-			//	{
-			//		uchar* pi=indexMat.ptr<uchar>(ii);
-			//		for(int jj=0; jj<indexMat.cols;jj++){
-			//			if(pi[jj] > 100)
-			//				count_check[255-pi[jj]]++;
-			//		}
-			//	}
-			//	for(int i=0; i< 20; i++) cout<<";"<<count_check[i];
-			//	cout<<endl;
-			//}
-
 			if(earliestIndex>-1){
 				int start = partToCompound[earliestIndex].start/framePerSecond;
 				int end = partToCompound[earliestIndex].end/framePerSecond;
@@ -957,28 +953,9 @@ void VideoAbstraction::compound(string path){
 					}
 				}
 			}
-			//if(useROI){
-			//	Mat currentRoiFrame;
-			//	currentResultFrame(rectROI).copyTo(currentRoiFrame);
-			//	videoWriter.write(currentRoiFrame);
-			//}
-			//else
-			//videoWriter.write(currentResultFrame);
-		
-			//if(testcount==150){
-			//	int count_check[20];
-			//	for(int i=0; i< 20; i++) count_check[i]=0;			
-			//	for(int ii=0; ii<indexMat.rows; ii++)
-			//	{
-			//		uchar* pi=indexMat.ptr<uchar>(ii);
-			//		for(int jj=0; jj<indexMat.cols;jj++){
-			//			if(pi[jj] > 100)
-			//				count_check[255-pi[jj]]++;
-			//		}
-			//	}
-			//	for(int i=0; i< 20; i++) cout<<";"<<count_check[i];
-			//	cout<<endl;
-			//}
+			uchar* pi=indexMat.ptr<uchar>(10);
+			pi[10]=baseIndex;
+
 			testcount++;
 			string filepath=Indexpath+InputName+"/";
 			fstream testfile;
@@ -988,14 +965,26 @@ void VideoAbstraction::compound(string path){
 				boost::filesystem::create_directories(dir);
 			}
 			string filename=boost::lexical_cast<string>(testcount)+".jpg";
-			imwrite(filepath+filename, indexMat);
-			videoWriter.write(currentResultFrame);
+
+			//resize
+			if(scaleSize > 1){ 
+				Mat dest1,dest2;
+				pyrUp(indexMat, dest1, Size(frameWidth*scaleSize,frameHeight*scaleSize));
+				pyrUp(currentResultFrame, dest2, Size(frameWidth*scaleSize,frameHeight*scaleSize));
+				imwrite(filepath+filename, dest1);
+				videoWriter.write(dest2);
+			}
+			else{
+				imwrite(filepath+filename, indexMat);
+				videoWriter.write(currentResultFrame);
+			}
+			//resize
 		}
 		currentFrame.release();
 		currentResultFrame.release();
-		zeroObject.release();
-		zeroObject1.release();
-		oneObject.release();
+		//zeroObject.release();
+		//zeroObject1.release();
+		//oneObject.release();
 	}
 	videoWriter.release();			//  视频合成结束
 	LOG(INFO)<<"合成结束\n";

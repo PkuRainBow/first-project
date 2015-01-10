@@ -38,11 +38,11 @@ struct ObjectCube{
 
 class VideoAbstraction{
 public:
-	VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname);
+	VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname, int size);
 	VideoAbstraction();
 	void init();
 	//~VideoAbstraction();
-	
+	int scaleSize;
 	int framePerSecond;				//帧数/秒
 	int maxLength;					//视频的最长长度
 	int curMaxLength;					//当前处理的视频的最长长度

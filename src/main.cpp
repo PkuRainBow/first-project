@@ -12,6 +12,7 @@
 
 #define DIV_NUMBER 9
 #define MAX_INDEX_COUNT 300
+#define MIN_AREA 100
 
 //declaration
 extern int readFrameLog(string logname);
@@ -93,13 +94,16 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 		imshow("video",showimage);
 	}
 	else if(select_flag && mouseEvent==CV_EVENT_LBUTTONUP){
+		int ID=0, maxCount=0,baseIndex=0;
+		uchar *p;
+		p=index_image.ptr<uchar>(10);
+		baseIndex=p[10];
+		baseIndex=0;
 		selectarea.width=x-selectarea.x;
 		selectarea.height=y-selectarea.y;
 		select_flag=false;
 		Mat destmat;
 		index_image(selectarea).copyTo(destmat);
-		int ID=0, maxCount=0;
-		uchar *p;
 		for(int i=0; i<MAX_INDEX_COUNT; i++) event_count[i]=0;
 		for(int i=0; i<destmat.rows; i++){
 			p=destmat.ptr<uchar>(i);
@@ -113,6 +117,7 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 				maxCount = event_count[i];
 			}
 		}
+		ID=ID+baseIndex*256;
 		cout<<"Info:	selected event No. is "<<ID<<endl;	
 		cout<<event_start.size()<<endl;
 		int start=event_start[ID];
@@ -158,7 +163,7 @@ static void mouseSnipShot(int event, int x, int y, int flags, void* userdata)
 //test=3: you can replay the seleted object's event full process
 //test=4: you can view 9 snip-shots of the original video 
 /*****************************************************************/
-void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int stage){
+void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int scale, int stage){
 	testVideoName=videoname;
 	//set all the necessary paths
 	string path=inputpath;
@@ -172,10 +177,10 @@ void testmultithread(const char* inputpath, const char* videoname, const char* m
 	create_path(config_path);
 	create_path(index_path);
 	
-	UserVideoAbstraction* user=new UserVideoAbstraction(inputpath, (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(), (char*)index_path.data(), videoname, midname);
+	UserVideoAbstraction* user=new UserVideoAbstraction(inputpath, (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(), (char*)index_path.data(), videoname, midname, scale);
 	user->UsersetGpu(true);
 	user->UsersetIndex(false);
-	user->UsersetMinArea(200);
+	user->UsersetMinArea(MIN_AREA);
 
 	int test = stage;
 	if(test==1){
@@ -265,7 +270,7 @@ void testmultithread(const char* inputpath, const char* videoname, const char* m
 			index_image=imread(filepath+filename);
 			namedWindow("video");
 			imshow("video",image);
-			//imshow("index", index_image);
+			imshow("index", index_image);
 			setMouseCallback("video",mouseRecover);
 			int key = waitKey(1); 
 			if(key==27)
@@ -339,8 +344,8 @@ int main(){
 
 	/* Tong Hao Test !!! */
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "juminxiaoqu.avi", "config-0","result-0.avi", 2337, 8);
-	//boost::thread test1(testmultithread,"D:/summarytest1/", "testvideo.avi", "config-1","result-1.avi", 1213, 8);
-	boost::thread test1(testmultithread,"D:/summarytest1/", "xiezilou.avi", "config-2","result-2.avi", 2963, 8, 2);
+	//boost::thread test1(testmultithread,"D:/summarytest1/", "testvideo.avi", "config-1","result-1.avi", 1213, 8, 1, 3);
+	boost::thread test1(testmultithread,"D:/summarytest1/", "xiezilou.avi", "config-2","result-2.avi", 2963, 8, 1, 1);
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "LOD_CIF_HQ_4_2.avi", "config-3","result-3.avi", 9146, 8);
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "gaodangxiaoqu.avi", "config-4","result-4.avi", 2337, 8);  // no video
 	//boost::thread test1(testmultithread,"D:/summarytest1/", "road.avi", "config-5","result-5.avi", 6205, 8, 3);
