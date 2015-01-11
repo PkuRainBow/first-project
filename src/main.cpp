@@ -96,9 +96,10 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 	else if(select_flag && mouseEvent==CV_EVENT_LBUTTONUP){
 		int ID=0, maxCount=0,baseIndex=0;
 		uchar *p;
-		p=index_image.ptr<uchar>(10);
-		baseIndex=p[10];
-		baseIndex=0;
+		p=index_image.ptr<uchar>(0);
+		baseIndex=(int)p[0];
+		cout<<"base Index"<<baseIndex<<endl;
+		waitKey(0);
 		selectarea.width=x-selectarea.x;
 		selectarea.height=y-selectarea.y;
 		select_flag=false;
@@ -164,7 +165,7 @@ static void mouseSnipShot(int event, int x, int y, int flags, void* userdata)
 //test=3: you can replay the seleted object's event full process
 //test=4: you can view 9 snip-shots of the original video 
 /*****************************************************************/
-void testmultithread(string inputpath, string videoname, string midname, string outputname, int frameCount, int CompoundCount, int scale, int stage){
+void testmultithread(string inputpath, string videoname, string midname, string outputname, int& frameCount, int CompoundCount, int scale, int stage){
 //void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int scale, int stage){
 	time_t start_time,end_time;
 	
@@ -198,7 +199,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		string t3 = t1+t2;
 		capture.open(t3);
 		ofstream ff(log_path+"FrameLog.txt", ofstream::app);
-		ff<<endl<<videoname<<"-总帧数-"<<capture.get(CV_CAP_PROP_FRAME_COUNT);
+		ff<<endl<<videoname<<"\t"<<capture.get(CV_CAP_PROP_FRAME_COUNT);
 		int number=0;
 		while (capture.read(image))
 		{
@@ -223,8 +224,9 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 			}
 		}
 		int UsedFrameCount = user->UsersaveConfigInfo();
+		frameCount=UsedFrameCount;
 		user->~UserVideoAbstraction();
-		ff<<endl<<videoname<<":"<<UsedFrameCount;
+		ff<<"\t"<<UsedFrameCount<<"\t"<<(double)UsedFrameCount/(double)capture.get(CV_CAP_PROP_FRAME_COUNT);
 		ff.close();
 	}
 	else if(test==2){
@@ -236,7 +238,8 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 			Rect selectRoi(x,y,100,100);
 			user->UsersetROI(selectRoi);
 		}
-		int frCount = readFrameLog(log_path+"FrameLog.txt");
+		//int frCount = readFrameLog(log_path+"FrameLog.txt");
+		int frCount=frameCount;
 		user->Usercompound(CompoundCount, (char*)t3.data(), frCount);
 		user->UserfreeObject();
 	}
@@ -335,23 +338,33 @@ int main(){
 	
 	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi", "gaodangxiaoqu.avi", 
 						"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
-						"Cam3.avi", "Cam4.avi", "Cam5.avi"};
+						"Cam3.avi", "Cam4.avi"};
 
+	int framecount[20];
 	/* Tong Hao Test !!! */
 	for(int i=0; i<testset1->size(); i++){	
 		string result_name="result_"+testset1[i];
-		string config_name="config_"+testset1[i];
-		boost::thread test1(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, 6205, 8, 1, 1);
+		string config_name="config_"+boost::lexical_cast<string>(i);
+		boost::thread test1(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, framecount[i], 8, 1, 1);
 		test1.join();
 		cout<<"finished..."<<endl;
 	}
+
+	//int all=testset1->size()-1;
 	for(int i=0; i<testset1->size(); i++){	
+		cout<<testset1[i]<<endl;
 		string result_name="result_"+testset1[i];
-		string config_name="config_"+testset1[i];
-		boost::thread test2(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, 6205, 8, 1, 2);
-		test2.join();
+		string config_name="config_"+boost::lexical_cast<string>(i);
+		boost::thread test1(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, framecount[i], 8, 1, 2);
+		test1.join();
 		cout<<"finished..."<<endl;
 	}
+
+	//string result_name="result_"+testset1[3];
+	//string config_name="config_"+3;
+	//boost::thread test1(testmultithread,"D:/summarytest1/", testset1[3], config_name, result_name, 6205, 8, 1, 2);
+	//test1.join();
+	//cout<<"finished..."<<endl;
 	return 0;
 }
 

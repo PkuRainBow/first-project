@@ -972,9 +972,17 @@ void VideoAbstraction::compound(string path){
 					}
 				}
 			}
-			uchar* pi=indexMat.ptr<uchar>(10);
-			pi[10]=baseIndex;
-
+			//cout<<"earlist index"<<earliestIndex<<endl;
+			//cout<<"base index"<<baseIndex<<endl;
+			//uchar* pi=indexMat.ptr<uchar>(0);
+			//for(int ii=0; ii<5; ii++){
+			//	pi[ii]=ii;
+			//	cout<<(int)pi[ii]<<":";
+			//}
+			//vector<int> compression_params;
+			//compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
+			//compression_params.push_back(100);
+			
 			testcount++;
 			string filepath=Indexpath+InputName+"/";
 			fstream testfile;
@@ -998,6 +1006,13 @@ void VideoAbstraction::compound(string path){
 				videoWriter.write(currentResultFrame);
 			}
 			//resize
+			//Mat check=imread(filepath+filename);
+			//pi=check.ptr<uchar>(0);
+			////cout<<255-(int)pi[0]<<endl;
+			//cout<<"read image"<<endl;
+			//for(int ii=0; ii<5; ii++){
+			//	cout<<(int)pi[ii]<<":";
+			//}
 		}
 		currentFrame.release();
 		currentResultFrame.release();
