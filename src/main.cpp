@@ -119,7 +119,7 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 				maxCount = event_count[i];
 			}
 		}
-		ID=ID+baseIndex*256;
+		//ID=ID+baseIndex*256;
 		cout<<"Info:	selected event No. is "<<ID<<endl;	
 		cout<<event_start.size()<<endl;
 		int start=event_start[ID];
@@ -165,7 +165,7 @@ static void mouseSnipShot(int event, int x, int y, int flags, void* userdata)
 //test=3: you can replay the seleted object's event full process
 //test=4: you can view 9 snip-shots of the original video 
 /*****************************************************************/
-void testmultithread(string inputpath, string videoname, string midname, string outputname, int& frameCount, int CompoundCount, int scale, int stage){
+void testmultithread(string inputpath, string videoname, string midname, string outputname, int frameCount, int CompoundCount, int scale, int stage){
 //void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int scale, int stage){
 	time_t start_time,end_time;
 	
@@ -188,7 +188,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
 	user->UsersetGpu(true);
 	user->UsersetIndex(false);
-	user->UsersetMinArea(MIN_AREA);
+	user->UsersetMinArea(MIN_AREA/(scale*scale));
 	
 	int test = stage;
 	ofstream ff(log_path+"TimeLog.txt", ofstream::app);
@@ -245,7 +245,8 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	}
 	else if(test==3){
 		state="test the index video function";
-		int frCount = readFrameLog(log_path+"FrameLog.txt");
+		//int frCount = readFrameLog(log_path+"FrameLog.txt");
+		int frCount=frameCount;
 		string t1=inputpath,t2=midname,t=videoname;
 		ori_video=inputpath+t;
 		string t3 = outputname;
@@ -253,6 +254,8 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		string temp;
 		//读取中间文件获取 event_start event_end event_length 信息
 		ifstream file(config_path+t2);
+		cout<<t2<<endl;
+		cout<<frCount<<endl;
 		for(int i=0; i<frCount; i++) {		
 			getline(file, temp, '#');
 		}
@@ -277,7 +280,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		string filepath=index_path+t+"/";
 		while(abstract_video.read(image)){
 			currentFrameIndex++;	
-			string filename=boost::lexical_cast<string>(currentFrameIndex)+".jpg";
+			string filename=boost::lexical_cast<string>(currentFrameIndex)+".bmp";
 			index_image=imread(filepath+filename);
 			namedWindow("video");
 			imshow("video",image);
@@ -336,35 +339,36 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 int main(){
 	// boost thread control ...
 	
-	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi", "gaodangxiaoqu.avi", 
+	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
 						"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
 						"Cam3.avi", "Cam4.avi"};
 
-	int framecount[20];
+	int framecount[] = {48374, 36675, 3008, 994, 3002, 4094, 7942, 25967, 17447, 2973, 6618, 5029, 4918, 5100, 14100, 5522, 9860};
 	/* Tong Hao Test !!! */
-	for(int i=0; i<testset1->size(); i++){	
-		string result_name="result_"+testset1[i];
-		string config_name="config_"+boost::lexical_cast<string>(i);
-		boost::thread test1(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, framecount[i], 8, 1, 1);
-		test1.join();
-		cout<<"finished..."<<endl;
-	}
+	//for(int i=0; i<testset1->size(); i++){	
+	//	string result_name="result_"+testset1[i];
+	//	string config_name="config_"+boost::lexical_cast<string>(i);
+	//	boost::thread test1(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, framecount[i], 8, 1, 1);
+	//	test1.join();
+	//	cout<<"finished..."<<endl;
+	//}
 
 	//int all=testset1->size()-1;
-	for(int i=0; i<testset1->size(); i++){	
-		cout<<testset1[i]<<endl;
-		string result_name="result_"+testset1[i];
-		string config_name="config_"+boost::lexical_cast<string>(i);
-		boost::thread test1(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, framecount[i], 8, 1, 2);
-		test1.join();
-		cout<<"finished..."<<endl;
-	}
+	//for(int i=0; i<testset1->size(); i++){	
+	//	cout<<testset1[i]<<endl;
+	//	string result_name="result_"+testset1[i];
+	//	string config_name="config_"+boost::lexical_cast<string>(i);
+	//	boost::thread test1(testmultithread,"D:/summarytest1/", testset1[i], config_name, result_name, framecount[i], 8, 1, 2);
+	//	test1.join();
+	//	cout<<"finished..."<<endl;
+	//}
 
-	//string result_name="result_"+testset1[3];
-	//string config_name="config_"+3;
-	//boost::thread test1(testmultithread,"D:/summarytest1/", testset1[3], config_name, result_name, 6205, 8, 1, 2);
-	//test1.join();
-	//cout<<"finished..."<<endl;
+	string result_name="result_test.avi";
+	string config_name="config_test";
+	boost::thread test1(testmultithread,"D:/summarytest1/", "test.avi", config_name, result_name, 1025, 8, 2, 3);
+	test1.join();
+	cout<<"finished..."<<endl;
+	getchar();
 	return 0;
 }
 

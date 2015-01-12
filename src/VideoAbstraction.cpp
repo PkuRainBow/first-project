@@ -9,7 +9,7 @@
 //
 VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname, int size){
 	scaleSize=size;
-	objectarea=100/scaleSize;
+	objectarea=100/(scaleSize*scaleSize);
 	useGpu=true;
 	Inputpath=inputpath;
 	Outpath=out_path;
@@ -47,7 +47,7 @@ void VideoAbstraction::init(){
 	maxLength=-1;
 	maxLengthToSpilt=300;
 	sum=0;
-	thres=1000;
+	thres=300;
 	currentLength=0;
 	tempLength=0;
 	noObjectCount=0;
@@ -105,7 +105,7 @@ void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){
 	vector<vector<Point>>::const_iterator itc=contors.begin();
 	//过滤掉过小的闭包，其他闭包全部存放到 newcontors 中
 	while(itc!=contors.end()){
-		if(contourArea(*itc)<thres){
+		if(contourArea(*itc)<objectarea){
 		//if(itc->size()<thres){
 			itc=contors.erase(itc);
 		}
@@ -440,12 +440,12 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 }
 
 
-void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前背景分离函数
-	//Mat currentFrame;
-	//if(scaleSize > 1)
-	//	pyrDown(inputFrame, currentFrame, Size(frameWidth,frameHeight));
-	//else
-	//	inputFrame.copyTo(currentFrame);
+void VideoAbstraction::Abstraction(Mat& inputFrame, int frameIndex){	  //前背景分离函数
+	Mat currentFrame;
+	if(scaleSize > 1)
+		pyrDown(inputFrame, currentFrame, Size(frameWidth,frameHeight));
+	else
+		inputFrame.copyTo(currentFrame);
 
 	if(frameIndex==50)								//如果中间文件原来已经存在，则执行清空操作
 		ofstream file_flush(Configpath+MidName, ios::trunc);
@@ -464,7 +464,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			mog.getBackgroundImage(gBackgroundImg);		//输出的背景信息存储在 gBackgroundImg
 			gBackgroundImg.copyTo(backgroundImage);		//保存背景图片到 backgroundImage 中
 		}
-		imwrite("background.jpg",backgroundImage);
+		imwrite(InputName+"background.jpg",backgroundImage);
 	}
 	else{										//50帧之后的图像需要正常处理
 		if(frameIndex%5==0){						//更新前背景信息的频率，表示每5帧做一次前背景分离
@@ -482,7 +482,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
 			//整个画面
-			if(sum>thres){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
+			if(sum>(thres/(scaleSize*scaleSize))){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				flag=true;
 			}
 		}
@@ -772,7 +772,7 @@ void VideoAbstraction::compound(string path){
 	int testcount=0;
 	Outpath=path;									//获取合成文件的输出路径以及完整的文件名字
 	videoCapture.open(Inputpath+InputName);			//合成操作前，需要提取背景图片信息保存到backgroundImage中
-	backgroundImage=imread("background.jpg");
+	backgroundImage=imread(InputName+"background.jpg");
 
 	videoWriter.open(Outpath, (int)videoCapture.get(CV_CAP_PROP_FOURCC), 
 		(double)videoCapture.get( CV_CAP_PROP_FPS ),
@@ -865,9 +865,9 @@ void VideoAbstraction::compound(string path){
 		for(int j=startCompound;j<curMaxLength;j++)
 		{
 			bool haveFrame=false;
-			Mat resultMask;
+			Mat resultMask, tempMask;
 			//初始化 indexMat
-			Mat indexMat(Size(frameWidth,frameHeight), CV_8U);
+			Mat indexMat(Size(frameWidth*scaleSize,frameHeight*scaleSize), CV_8U);
 
 			//bitwise_and(currentStartIndex,zeroObject1,currentStartIndex);
 			//bitwise_and(currentEndIndex,zeroObject1,currentStartIndex);
@@ -890,14 +890,15 @@ void VideoAbstraction::compound(string path){
 				videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[earliestIndex].start-1+j-shift[earliestIndex]);
 				//resize
 				//videoCapture>>currentFrame;
-				videoCapture>>tempFrame;
-				if(scaleSize > 1)		
-					pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
-				else
-					tempFrame.copyTo(currentFrame);
+				videoCapture>>currentFrame;
+				//if(scaleSize > 1)		
+				//	pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
+				//else
+				//	tempFrame.copyTo(currentFrame);
 				//resize
 				currentResultFrame=currentFrame.clone();
-				resultMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);	
+				tempMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);
+				pyrUp(tempMask, resultMask, Size(frameWidth*scaleSize,frameHeight*scaleSize));
 				for(int ii=0; ii<indexMat.rows; ii++)
 				{
 					uchar* pi=indexMat.ptr<uchar>(ii);
@@ -925,13 +926,14 @@ void VideoAbstraction::compound(string path){
 					videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[i].start-1+j-shift[i]); //设置背景图片
 					//resize
 					//videoCapture>>currentFrame;
-					videoCapture>>tempFrame;
-					if(scaleSize > 1)		
-						pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
-					else
-						tempFrame.copyTo(currentFrame);
+					videoCapture>>currentFrame;
+					//if(scaleSize > 1)		
+					//	pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
+					//else
+					//	tempFrame.copyTo(currentFrame);
 					//resize
-					Mat currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
+					Mat tempMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
+					pyrUp(tempMask, currentMask, Size(frameWidth*scaleSize,frameHeight*scaleSize));
 					writeMask(currentMask, indexMat, (i+ss*motionToCompound)%256);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 
@@ -952,7 +954,7 @@ void VideoAbstraction::compound(string path){
 				findContours(resultMask,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
 				vector<vector<Point>>::const_iterator itc_re=re_contours.begin();
 				while(itc_re!=re_contours.end()){
-					if(itc_re->size() < objectarea){
+					if(contourArea(*itc_re) < objectarea){
 						itc_re=re_contours.erase(itc_re);
 					}
 					else{
@@ -991,20 +993,10 @@ void VideoAbstraction::compound(string path){
 				boost::filesystem::path dir(filepath);
 				boost::filesystem::create_directories(dir);
 			}
-			string filename=boost::lexical_cast<string>(testcount)+".jpg";
+			string filename=boost::lexical_cast<string>(testcount)+".bmp";
 
-			//resize
-			if(scaleSize > 1){ 
-				Mat dest1,dest2;
-				pyrUp(indexMat, dest1, Size(frameWidth*scaleSize,frameHeight*scaleSize));
-				pyrUp(currentResultFrame, dest2, Size(frameWidth*scaleSize,frameHeight*scaleSize));
-				imwrite(filepath+filename, dest1);
-				videoWriter.write(dest2);
-			}
-			else{
-				imwrite(filepath+filename, indexMat);
-				videoWriter.write(currentResultFrame);
-			}
+			imwrite(filepath+filename, indexMat);
+			videoWriter.write(currentResultFrame);
 			//resize
 			//Mat check=imread(filepath+filename);
 			//pi=check.ptr<uchar>(0);

@@ -73,5 +73,5 @@ void UserVideoAbstraction::UsersetIndex(bool isindex){
 }
 
 void UserVideoAbstraction::UsersetMinArea(int minarea){
-	userVB->objectarea=minarea/userVB->scaleSize;
+	userVB->objectarea=minarea;
 }

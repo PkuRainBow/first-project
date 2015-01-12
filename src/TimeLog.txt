@@ -1,0 +1,36 @@
+20111201_170301.avi	Background/Foreground Subtraction	video abstraction time: 1193
+20111202_082713.avi	Background/Foreground Subtraction	video abstraction time: 784
+juminxiaoqu.avi	Background/Foreground Subtraction	video abstraction time: 19
+testvideo.avi	Background/Foreground Subtraction	video abstraction time: 10
+xiezilou.avi	Background/Foreground Subtraction	video abstraction time: 28
+LOD_CIF_HQ_4_2.avi	Background/Foreground Subtraction	video abstraction time: 119
+road.avi	Background/Foreground Subtraction	video abstraction time: 40
+loumenkou.avi	Background/Foreground Subtraction	video abstraction time: 474
+damenkou.avi	Background/Foreground Subtraction	video abstraction time: 362
+AA012507.avi	Background/Foreground Subtraction	video abstraction time: 39
+AA013101.avi	Background/Foreground Subtraction	video abstraction time: 78
+AA013102.avi	Background/Foreground Subtraction	video abstraction time: 63
+AA013103.avi	Background/Foreground Subtraction	video abstraction time: 63
+AA013106.avi	Background/Foreground Subtraction	video abstraction time: 61
+Cam01.avi	Background/Foreground Subtraction	video abstraction time: 249
+Cam3.avi	Background/Foreground Subtraction	video abstraction time: 30
+Cam4.avi	Background/Foreground Subtraction	video abstraction time: 42
+20111201_170301.avi	compound the result video	video abstraction time: 1774
+20111202_082713.avi	compound the result video	video abstraction time: 1103
+juminxiaoqu.avi	compound the result video	video abstraction time: 26
+testvideo.avi	compound the result video	video abstraction time: 7
+xiezilou.avi	compound the result video	video abstraction time: 43
+LOD_CIF_HQ_4_2.avi	compound the result video	video abstraction time: 82
+road.avi	compound the result video	video abstraction time: 263
+loumenkou.avi	compound the result video	video abstraction time: 1003
+damenkou.avi	compound the result video	video abstraction time: 684
+AA012507.avi	compound the result video	video abstraction time: 153
+AA013101.avi	compound the result video	video abstraction time: 149
+AA013102.avi	compound the result video	video abstraction time: 117
+AA013103.avi	compound the result video	video abstraction time: 102
+AA013106.avi	compound the result video	video abstraction time: 117
+Cam01.avi	compound the result video	video abstraction time: 393
+Cam3.avi	compound the result video	video abstraction time: 80
+Cam4.avi	compound the result video	video abstraction time: 139
+test.avi	Background/Foreground Subtraction	video abstraction time: 9
+test.avi	compound the result video	video abstraction time: 0
