@@ -12,7 +12,7 @@
 
 #define DIV_NUMBER 9
 #define MAX_INDEX_COUNT 300
-#define MIN_AREA 100
+#define MIN_AREA 500
 
 //declaration
 extern int readFrameLog(string logname);
@@ -40,7 +40,7 @@ int small_height;//每个小图的高度
 //setROI=false by default 
 Rect selectarea;
 bool select_flag=false;
-bool setROI=false;
+bool setROI=true;
 Mat image,imageRoi,showimage,index_image;
 //Video Index
 int currentFrameIndex=0;
@@ -82,9 +82,10 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 {
 	Point p1,p2;
 	if(mouseEvent==CV_EVENT_LBUTTONDOWN){
+		select_flag=true;
 		selectarea.x=x;
 		selectarea.y=y;
-		select_flag=true;
+		
 	}
 	else if(select_flag && mouseEvent==CV_EVENT_MOUSEMOVE){
 		image.copyTo(showimage);
@@ -94,15 +95,16 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 		imshow("video",showimage);
 	}
 	else if(select_flag && mouseEvent==CV_EVENT_LBUTTONUP){
+		select_flag=false;
 		int ID=0, maxCount=0,baseIndex=0;
 		uchar *p;
 		p=index_image.ptr<uchar>(0);
 		baseIndex=(int)p[0];
 		cout<<"base Index"<<baseIndex<<endl;
-		waitKey(0);
+		//waitKey(0);
 		selectarea.width=x-selectarea.x;
 		selectarea.height=y-selectarea.y;
-		select_flag=false;
+		
 		Mat destmat;
 		index_image(selectarea).copyTo(destmat);
 		for(int i=0; i<MAX_INDEX_COUNT; i++) event_count[i]=0;
@@ -201,8 +203,19 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		ofstream ff(log_path+"FrameLog.txt", ofstream::app);
 		ff<<endl<<videoname<<"\t"<<capture.get(CV_CAP_PROP_FRAME_COUNT);
 		int number=0;
+		setROI=false;
 		while (capture.read(image))
 		{
+			if(number==0){
+				namedWindow("video");
+				imshow("video",image);
+				setMouseCallback("video",mouseSelect);
+				waitKey(0);
+				cvDestroyWindow("video");
+				//user->UsersetROI(selectarea);
+				ofstream ff(log_path+"AreaLog.txt", ofstream::app);
+				ff<<endl<<selectarea.x<<":"<<selectarea.y;
+			}
 			if(setROI){
 				if(number==0){
 					namedWindow("video");
@@ -210,7 +223,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 					setMouseCallback("video",mouseSelect);
 					waitKey(0);
 					cvDestroyWindow("video");
-					user->UsersetROI(selectarea);
+					//user->UsersetROI(selectarea);
 					ofstream ff(log_path+"AreaLog.txt", ofstream::app);
 					ff<<endl<<selectarea.x<<":"<<selectarea.y;
 				}
@@ -226,7 +239,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		int UsedFrameCount = user->UsersaveConfigInfo();
 		frameCount=UsedFrameCount;
 		user->~UserVideoAbstraction();
-		ff<<"\t"<<UsedFrameCount<<"\t"<<(double)UsedFrameCount/(double)capture.get(CV_CAP_PROP_FRAME_COUNT);
+		ff<<"\t"<<UsedFrameCount<<"\t"<<(double)UsedFrameCount/(double)capture.get(CV_CAP_PROP_FRAME_COUNT)<<":"<<UsedFrameCount;
 		ff.close();
 	}
 	else if(test==2){
@@ -238,15 +251,17 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 			Rect selectRoi(x,y,100,100);
 			user->UsersetROI(selectRoi);
 		}
-		//int frCount = readFrameLog(log_path+"FrameLog.txt");
-		int frCount=frameCount;
+		//int frCount=frameCount;
+		int frCount = readFrameLog(log_path+"FrameLog.txt");
+		cout<<frCount<<endl;
+		//int frCount=frameCount;
 		user->Usercompound(CompoundCount, (char*)t3.data(), frCount);
 		user->UserfreeObject();
 	}
 	else if(test==3){
 		state="test the index video function";
-		//int frCount = readFrameLog(log_path+"FrameLog.txt");
-		int frCount=frameCount;
+		int frCount = readFrameLog(log_path+"FrameLog.txt");
+		//int frCount=frameCount;
 		string t1=inputpath,t2=midname,t=videoname;
 		ori_video=inputpath+t;
 		string t3 = outputname;
@@ -278,15 +293,21 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		abstract_video.open(t3);
 		currentFrameIndex=0;
 		string filepath=index_path+t+"/";
+		namedWindow("video");
+		setMouseCallback("video",mouseRecover);
+		abstract_video.read(image);
+		imshow("video",image);
+		waitKey(0);
+		abstract_video.open(t3);
 		while(abstract_video.read(image)){
 			currentFrameIndex++;	
 			string filename=boost::lexical_cast<string>(currentFrameIndex)+".bmp";
 			index_image=imread(filepath+filename);
-			namedWindow("video");
 			imshow("video",image);
-			imshow("index", index_image);
-			setMouseCallback("video",mouseRecover);
-			int key = waitKey(1); 
+			//waitKey(30);
+			//imshow("index", index_image);
+			//setMouseCallback("video",mouseRecover);
+			int key = waitKey(30); 
 			if(key==27)
 				waitKey(0);
 		}
@@ -332,7 +353,9 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		//check or debug 
 	}
 	end_time=time(NULL);
+	cout<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<" s"<<endl;
 	ff<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<endl;
+	ff.close();
 }
 
 
@@ -363,12 +386,32 @@ int main(){
 	//	cout<<"finished..."<<endl;
 	//}
 
+	cout<<"***********************************************************************************"<<endl;
+	cout<<"\t"<<"Using Guidance "<<endl;
+	cout<<"\t"<<"Please input 1 / 2 / 3 / 4"<<endl;
+	cout<<"\t"<<"1:   subtract the background and foreground of the input video"<<endl;
+	cout<<"\t"<<"2:   compound the convex point sequence to produce the abstracted video"<<endl;
+	cout<<"\t"<<"3:   you can replay the seleted object's event full process"<<endl;
+	cout<<"\t"<<"4:   you can view 9 snip-shots of the original video"<<endl;
+	cout<<"\t"<<"others:   Exit !"<<endl;
+	cout<<"*********************************************************************************"<<endl;
 	string result_name="result_test.avi";
 	string config_name="config_test";
-	boost::thread test1(testmultithread,"D:/summarytest1/", "test.avi", config_name, result_name, 1025, 8, 2, 3);
-	test1.join();
-	cout<<"finished..."<<endl;
-	getchar();
+	//boost::thread test1(testmultithread,"test/", "test.avi", config_name, result_name, 1025, 8, 2, 3);
+	
+	int choice;
+	bool flag=true;
+	while(flag){
+		cout<<"Please input the choice No. : ";
+		cin>>choice;
+		if(choice== 1 || choice == 2 || choice == 3 || choice == 4){
+			boost::thread test1(testmultithread,"test/", "高档小区.avi", config_name, result_name, 2199, 8, 1, choice);
+			test1.join();
+			cout<<"finish step "<<choice<<endl;
+		}
+		else
+			return 0;
+	}
 	return 0;
 }
 
@@ -395,6 +438,8 @@ int readFrameLog(string logname){
 		string lastLine;            
 		getline(fin,lastLine);                      // Read the current line
 		cout<< lastLine<<'\n';     // Display it
+		//lastLine
+		
 	    string token = lastLine.substr(lastLine.find(":")+1, lastLine.size());
 		return atoi(token.c_str());
 		fin.close();
