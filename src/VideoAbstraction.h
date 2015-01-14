@@ -60,7 +60,11 @@ public:
 	int backgroundSubtractionMethod;	//前背景分离  1-高斯混合模型 2-ViBe
 	int LEARNING_RATE;		
 	//vector<ObjectCube> objectVector;	//存储多个运动序列，当存储数目达到motionToCompound 后，写入本地文件
-	vector<ObjectCube> partToCompound;	//存储一个运动对象的运动序列 
+	vector<ObjectCube> partToCompound;	//存储需要合成的多个运动序列
+	vector<ObjectCube> partToCopy;      //存储视角发生移动的场景，直接复制不参与到复制运动序列中
+	int partToCompoundNum;
+	int partToCopyNum;
+
 	Mat backgroundImage;				//存储 混合高斯模型提取出的 背景信息------分割程序运行的第二步需要操作的部分
 	Mat currentStartIndex,currentEndIndex;
 
@@ -78,6 +82,7 @@ public:
 	int ObjectCubeNumber;				//包含运动序列的帧的总数量
 	vector<int> frame_start;			//记录所有运动序列的开始帧序号/结束帧序号
 	vector<int> frame_end;
+	vector<bool> view_change;
 	//vector<string> allObjectCube;		//存储所有运动序列的凸包信息 
 	int loadIndex;					//load凸包运动信息的偏移参数
 
