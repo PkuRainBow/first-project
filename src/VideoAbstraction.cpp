@@ -494,10 +494,19 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
 			//整个画面
 			if(sum>(thres/(scaleSize*scaleSize))){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
+				cout<<"points number : "<<sum<<endl;
 				flag=true;
 			}
+
+			//if(sum/(frameHeight*frameWidth)>0.6){
+			//	imshow("check", currentMask);
+			//	waitKey(0);
+			//}
 		}
 		if(flag){							   //判断当前的图像帧是否包含有意义的运动序列信息
+			//imshow("check", currentMask);
+			//cout<<"area rate : "<<(double)sum/(frameHeight*frameWidth)<<endl;
+			//waitKey(0);
 			currentObject.objectMask.push_back(matToVector(currentMask));					//将当前帧添加到运动序列中
 			if(currentObject.start<0) currentObject.start=frameIndex;
 			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*10){	//当前运动序列太长，认为其实无意义的运动序列（比如一直摇动的树叶信息或者光线变化），则清空成功新开始
@@ -605,6 +614,7 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 			contors=stringToContors(temp);
 			Mat bb(frameHeight,frameWidth,CV_8U,Scalar::all(0));
 			drawContours(bb,contors,-1,Scalar(255),-1);
+			
 			ob.objectMask.push_back(matToVector(bb));	
 		}
 		vector<vector<Point>>().swap(contors);
@@ -781,14 +791,36 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 
 void VideoAbstraction::compound(string path){	
 	int testcount=0;
-	Outpath=path;									//获取合成文件的输出路径以及完整的文件名字
-	videoCapture.open(Inputpath+InputName);			//合成操作前，需要提取背景图片信息保存到backgroundImage中
+	Outpath=path;									//获取合成文件的输出路径以及完整的文件名	videoCapture.open(Inputpath+InputName);			//合成操作前，需要提取背景图片信息保存到backgroundImage中
 	backgroundImage=imread(InputName+"background.jpg");
+	//cout<<Outpath<<endl;
+	//cout<<"frame width "<<frameWidth<<endl;
+	//cout<<"frame height "<<frameHeight<<endl;
+	//cout<<Inputpath<<"   "<<InputName<<endl;
+	//cout<<scaleSize<<endl;
+	/*	videoWriter.open(Outpath, (int)videoCapture.get(CV_CAP_PROP_FOURCC), 
+	(double)videoCapture.get( CV_CAP_PROP_FPS ),
+	cv::Size(frameWidth*scaleSize, frameHeight*scaleSize),
+	true );	*/							  //输出视频的属性信息和输入视频的信息完全相同
+	//LOG(ERROR) <<"Can't create output video file: "<<Outpath<<endl;
+
+	//indexVideo
+	//Set the second @parameter -1
+	//indexWriter.open(Indexpath+"index_"+InputName, -1, 
+	//	(double)videoCapture.get( CV_CAP_PROP_FPS ),
+	//	cv::Size(frameWidth, frameHeight),
+	//	true );		
+
+	//if (!indexWriter.isOpened()){
+	//	LOG(ERROR) <<"Can't create output video file: "<<Indexpath+"index_"+InputName<<endl;
+	//	return;
+	//}
 
 	videoWriter.open(Outpath, (int)videoCapture.get(CV_CAP_PROP_FOURCC), 
-		(double)videoCapture.get( CV_CAP_PROP_FPS ),
-		cv::Size(frameWidth*scaleSize, frameHeight*scaleSize),
-		true );								  //输出视频的属性信息和输入视频的信息完全相同
+		(double)videoCapture.get(CV_CAP_PROP_FPS),
+		cv::Size(frameWidth, frameHeight),
+		true );		
+
 	if (!videoWriter.isOpened()){
 		LOG(ERROR) <<"Can't create output video file: "<<Outpath<<endl;
 		return;
@@ -839,7 +871,7 @@ void VideoAbstraction::compound(string path){
 			for(int i=0;i<synopsis;i++){					  //初始化偏移序列
 				shift[i]=0;
 			}
-			while(1){									  //计算满足冲突比较少的所有的偏移序列
+			while(1){									   //计算满足冲突比较少的所有的偏移序列
 				cur_collision=graphCut(shift,partToCompound);
 				LOG(INFO)<<"当前碰撞:"<<cur_collision<<endl;
 				if(cur_collision<0) break;
@@ -850,6 +882,8 @@ void VideoAbstraction::compound(string path){
 			}
 		}
 		shift=tmpshift;
+		// check whether there are obvious changes in the PartToCompound Sequence ... 
+
 
 		LOG(INFO)<<"最小损失"<<min<<endl;
 		LOG(INFO)<<"时间偏移计算耗时"<<clock()-starttime<<"豪秒\n";
@@ -996,11 +1030,11 @@ void VideoAbstraction::compound(string path){
 			}
 			//cout<<"earlist index"<<earliestIndex<<endl;
 			//cout<<"base index"<<baseIndex<<endl;
-			//uchar* pi=indexMat.ptr<uchar>(0);
-			//for(int ii=0; ii<5; ii++){
-			//	pi[ii]=ii;
-			//	cout<<(int)pi[ii]<<":";
-			//}
+			uchar* pi=indexMat.ptr<uchar>(5);
+			for(int ii=0; ii<10; ii++){
+				pi[ii]=ii;
+				cout<<(int)pi[ii]<<":";
+			}
 			//vector<int> compression_params;
 			//compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
 			//compression_params.push_back(100);
@@ -1014,17 +1048,19 @@ void VideoAbstraction::compound(string path){
 				boost::filesystem::create_directories(dir);
 			}
 			string filename=boost::lexical_cast<string>(testcount)+".bmp";
-
 			imwrite(filepath+filename, indexMat);
+
+			//indexWriter.write(indexMat);
 			videoWriter.write(currentResultFrame);
+
 			//resize
-			//Mat check=imread(filepath+filename);
-			//pi=check.ptr<uchar>(0);
-			////cout<<255-(int)pi[0]<<endl;
-			//cout<<"read image"<<endl;
-			//for(int ii=0; ii<5; ii++){
-			//	cout<<(int)pi[ii]<<":";
-			//}
+			Mat check=imread(filepath+filename);
+			pi=check.ptr<uchar>(5);
+			//cout<<255-(int)pi[0]<<endl;
+			cout<<"read image"<<endl;
+			for(int ii=0; ii<10; ii++){
+				cout<<(int)pi[ii]<<":";
+			}
 		}
 		currentFrame.release();
 		currentResultFrame.release();
