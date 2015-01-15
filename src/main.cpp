@@ -418,10 +418,11 @@ int main(){
 	//}
 
 	string inputvideo="大门口.avi";
+	//string inputvideo="testvideo.avi";
 	cout<<inputvideo<<endl;
 	string result_name="result_"+inputvideo;
 	string config_name="config_test";
-	boost::thread test2(testmultithread,"F:/TongHaoTest2/", inputvideo, config_name, result_name, 0, 8, 1, 1, true);
+	boost::thread test2(testmultithread,"F:/TongHaoTest2/", inputvideo, config_name, result_name, 0, 8, 1, 2, true);
 	test2.join();
 	cout<<"finished..."<<endl;
 

@@ -494,14 +494,9 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
 			//整个画面
 			if(sum>(thres/(scaleSize*scaleSize))){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
-				cout<<"points number : "<<sum<<endl;
+				//cout<<"points number : "<<sum<<endl;
 				flag=true;
 			}
-
-			//if(sum/(frameHeight*frameWidth)>0.6){
-			//	imshow("check", currentMask);
-			//	waitKey(0);
-			//}
 		}
 		if(flag){							   //判断当前的图像帧是否包含有意义的运动序列信息
 			//imshow("check", currentMask);
@@ -594,7 +589,7 @@ void VideoAbstraction::saveConfigInfo(){						//保存所有凸包运动序列�
 	ff.close();
 }
 
-void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指定帧序列号范围内的运动帧导入 partToCompound 中
+void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指定事件序列号范围内的运动帧导入 partToCompound 和 partToCopy 中
 	partToCompoundNum=0;
 	partToCopyNum=0;
 	ifstream file(Configpath+MidName);
@@ -605,6 +600,7 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 	int length=0;
 	ObjectCube ob;
 	vector<vector<Point>> contors;
+	bool scene_change=false;
 	for(int j=index_start; j<=index_end; j++){
 		cout<<frame_start[j]<<"\t"<<frame_end[j]<<endl;
 		ob.start=frame_start[j];
@@ -619,7 +615,7 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 			drawContours(bb,contors,-1,Scalar(255),-1);
 			//check whether the view is changed
 			int elecount=countNonZero(bb);
-			if(elecount/(frameWidth*frameHeight) > 0.6)	changeSceneNum+=1;
+			if((double)elecount/(frameWidth*frameHeight) > 0.5)	changeSceneNum+=1;
 			ob.objectMask.push_back(matToVector(bb));	
 		}
 		loadIndex+=length;
@@ -627,13 +623,15 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 		curMaxLength=max(length,curMaxLength);
 
 		//view change
-		if(changeSceneNum > 10){
-			view_change[j]=true;
+		if(changeSceneNum > 20 || scene_change){
+			cout<<"put the event into the partToCopy ... "<<endl;
+			scene_change=true;
 			partToCopy.push_back(ob);
 			vector<vector<bool>>().swap(ob.objectMask);
 			partToCopyNum++;
 		}
 		else{
+			cout<<"put the event into the partToCompound ... "<<endl;
 			partToCompound.push_back(ob);
 			vector<vector<bool>>().swap(ob.objectMask);
 			partToCompoundNum++;
@@ -676,9 +674,6 @@ void  VideoAbstraction::LoadConfigInfo(int frameCountUsed){  //用于分阶段�
 		file>>end;
 		frame_start.push_back(start);
 		frame_end.push_back(end);
-	}
-	for(int i=0; i<frame_start.size(); i++){
-		view_change.push_back(false);
 	}
 	file.close();
 }
@@ -875,9 +870,10 @@ void VideoAbstraction::compound(string path){
 		else{												//正常合成 motionToCompound 个运动序列
 			loadObjectCube(ss*motionToCompound, (ss+1)*motionToCompound-1);	
 		}
-
+		//
+		cout<<"*************    partToCompound part    ***********"<<endl;
+		cout<<"Compound sequences number: "<<partToCompoundNum<<endl;
 		synopsis=partToCompoundNum;
-
 		vector<int> shift(synopsis,0);							//运动序列的偏移数组
 		int min=INT_MAX,cur_collision=0;						
 		//Mat zeroObject(frameHeight,frameWidth,CV_8U,Scalar::all(0)),zeroObject1(frameHeight,frameWidth,CV_16U,Scalar::all(0)),oneObject(frameHeight,frameWidth,CV_16U,Scalar::all(1));
@@ -924,7 +920,7 @@ void VideoAbstraction::compound(string path){
 		}
 		cout<<"start\t"<<startCompound<<endl;
 		cout<<"end\t"<<curMaxLength<<endl;
-		cout<<"writing to the video ..."<<endl;
+		//cout<<"writing to the video ..."<<endl;
 		sumLength+=(curMaxLength-startCompound);	
 		for(int j=startCompound;j<curMaxLength;j++)
 		{
@@ -1034,24 +1030,73 @@ void VideoAbstraction::compound(string path){
 					}
 				}
 			}		
-			testcount++;
-			string filepath=Indexpath+InputName+"/";
-			fstream testfile;
-			testfile.open(filepath, ios::in);
-			if(!testfile){
-				boost::filesystem::path dir(filepath);
-				boost::filesystem::create_directories(dir);
-			}
-			string filename=boost::lexical_cast<string>(testcount)+".bmp";
-			imwrite(filepath+filename, indexMat);
+			//testcount++;
+			//string filepath=Indexpath+InputName+"/";
+			//fstream testfile;
+			//testfile.open(filepath, ios::in);
+			//if(!testfile){
+			//	boost::filesystem::path dir(filepath);
+			//	boost::filesystem::create_directories(dir);
+			//}
+			//string filename=boost::lexical_cast<string>(testcount)+".jpeg";
+			//imwrite(filepath+filename, indexMat);
 			videoWriter.write(currentResultFrame);
 		}
+		//deal with the scene change cases ...
+		cout<<"*************    partToCopy part    ***********"<<endl;
+		cout<<"Copy sequences number: "<<partToCopyNum<<endl;
 		if(partToCopyNum>0){
 			for(int i=0; i<partToCopyNum; i++){
-				for(int j=partToCopy[i].start; j<partToCopy[i].end; j++){
-					videoCapture.set(CV_CAP_PROP_POS_FRAMES,j);
-					videoCapture>>currentFrame;
-					videoWriter.write(currentFrame);
+				int start = partToCopy[i].start/framePerSecond;
+				int end = partToCopy[i].end/framePerSecond;
+				int length = partToCopy[i].end-partToCopy[i].start+1;
+				int base_index = partToCopy[i].start;
+				sumLength += length;
+				for(int j=0; j<length; j++){
+					videoCapture.set(CV_CAP_PROP_POS_FRAMES,j+base_index);
+					videoCapture>>currentResultFrame;
+					//put the time tag info into the readed frame...
+					vector<Point> info;
+					vector<vector<Point>> re_contours;	
+					Mat mat1=vectorToMat(partToCopy[i].objectMask[j],frameHeight,frameWidth);
+					findContours(mat1,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
+					vector<vector<Point>>::const_iterator itc_re=re_contours.begin();
+					while(itc_re!=re_contours.end()){
+						if(contourArea(*itc_re) < objectarea){
+							itc_re=re_contours.erase(itc_re);
+						}
+						else{
+							convexHull(*itc_re,info);
+							Point p1 = info.at(1);
+							Point p2 = info.at(info.size()/2);
+							Point mid;
+							mid.x = (p1.x+p2.x)/2;
+							mid.y = (p1.y+p2.y)/2;
+							if(useROI){
+								mid.x += rectROI.x;
+								mid.y += rectROI.y;
+							}
+							int s1,s2,s3,e1,e2,e3;
+							s1=start/3600;
+							s2=(start%3600)/60;
+							s3=start%60;
+							e1=end/3600;
+							e2=(end%3600)/60;
+							e3=end%60;
+							putText(currentResultFrame,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
+							itc_re++;
+						}
+					}
+					videoWriter.write(currentResultFrame);
+					//create and store the index mat ...
+					//Mat indexMat(Size(frameWidth*scaleSize,frameHeight*scaleSize), CV_8U);
+					//for(int ii=0; ii<indexMat.rows; ii++)
+					//{
+					//	uchar* pi=indexMat.ptr<uchar>(ii);
+					//	for(int jj=0; jj<indexMat.cols;jj++){
+					//		pi[jj]=(partToCompoundNum+ss*motionToCompound+i)%256;
+					//	}
+					//}
 				}
 			}
 		}

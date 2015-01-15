@@ -82,7 +82,7 @@ public:
 	int ObjectCubeNumber;				//包含运动序列的帧的总数量
 	vector<int> frame_start;			//记录所有运动序列的开始帧序号/结束帧序号
 	vector<int> frame_end;
-	vector<bool> view_change;
+	//vector<bool> view_change;
 	//vector<string> allObjectCube;		//存储所有运动序列的凸包信息 
 	int loadIndex;					//load凸包运动信息的偏移参数
 
