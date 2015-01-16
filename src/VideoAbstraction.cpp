@@ -18,7 +18,7 @@ VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log
 	Indexpath=index_path;
 	InputName=videoname;
 	MidName=midname;
-	thres=100;
+	thres=2000;
 	videoCapture.open(inputpath+videoname);
 	frameHeight=videoCapture.get(CV_CAP_PROP_FRAME_HEIGHT)/scaleSize;
 	frameWidth=videoCapture.get(CV_CAP_PROP_FRAME_WIDTH)/scaleSize;
@@ -827,7 +827,6 @@ void VideoAbstraction::compound(string path){
 	int testcount=0;
 	Outpath=path;									//获取合成文件的输出路径以及完整的文件名	videoCapture.open(Inputpath+InputName);			//合成操作前，需要提取背景图片信息保存到backgroundImage中
 	backgroundImage=imread(InputName+"background.jpg");
-
 	//cout<<Outpath<<endl;
 	//cout<<"frame width "<<frameWidth<<endl;
 	//cout<<"frame height "<<frameHeight<<endl;
@@ -1248,7 +1247,7 @@ bool VideoAbstraction::saveContorsOfResultFrameToFile(int frame_Num, cv::Mat& ma
 	std::string fileName = getTempFilePath(frame_Num);
 	std::ofstream outfile(fileName, ios::ate);
     //freopen("exe.txt","a",stdout);
-	cout<<"replay"<<fileName<<"  "<<frame_Num<<"   "<<indexOfMask<<endl;
+	//cout<<"replay"<<fileName<<"  "<<frame_Num<<"   "<<indexOfMask<<endl;
 	std::vector<std::vector<cv::Point> >contours;
 	cv::findContours(mask, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 	outfile << indexOfMask << " " << contorsToString(contours) << std::endl;
@@ -1310,7 +1309,6 @@ bool VideoAbstraction::restoreMaskOfFram(cv::Mat& FrameMask, cv::Mat& oneContors
 				m_data++;
 
 			}
-
 		}
 	}
 	return true;

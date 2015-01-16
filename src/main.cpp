@@ -12,7 +12,7 @@
 
 #define DIV_NUMBER 9
 #define MAX_INDEX_COUNT 300
-#define MIN_AREA 100
+#define MIN_AREA 200
 
 //declaration
 extern int readFrameLog(string logname);
@@ -168,7 +168,7 @@ static void mouseSnipShot(int event, int x, int y, int flags, void* userdata)
 //test=3: you can replay the seleted object's event full process
 //test=4: you can view 9 snip-shots of the original video 
 /*****************************************************************/
-void testmultithread(string inputpath, string videoname, string midname, string outputname, int& frameCount, int CompoundCount, int scale, int stage, bool readlog){
+void testmultithread(string inputpath, string videoname, string midname, string outputname, int& frameCount, int CompoundCount, int stage, bool readlog){
 //void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int scale, int stage){
 	time_t start_time,end_time;
 	start_time=time(NULL);
@@ -186,7 +186,21 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	create_path(config_path);
 	create_path(index_path);
 	create_path(keyframe_path);
+
+	VideoCapture capture;
+	string t1=inputpath,t2=videoname;
+	string t3 = t1+t2;
+	capture.open(t3);
+	int video_width=capture.get(CV_CAP_PROP_FRAME_WIDTH);
+	int video_height=capture.get(CV_CAP_PROP_FRAME_HEIGHT);
+
+	float scale=1;
+	if (video_width>360)
+	{
+		scale=((float)video_width)/360;
+	}
 	
+
 	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
 	user->UsersetGpu(true);
@@ -365,8 +379,9 @@ int main(){
 		cout<<"Please input the choice No. : ";
 		cin>>choice;
 		if(choice== 1 || choice == 2 || choice == 3 || choice == 4){
-			//boost::thread test1(testmultithread,"F:/TongHaoTest2/", "testvideo.avi", config_name, result_name, 0, 8, 1, choice, true);
-			boost::thread test1(testmultithread,"F:/TongHaoTest2/", "大门口.avi", config_name, result_name, 0, 8, 1, choice, true);
+			//boost::thread test1(testmultithread,"F:/TongHaoTest2/", "testvideo.avi", config_name, result_name, 0, 8, choice, true);
+			boost::thread test1(testmultithread,"F:/TongHaoTest2/", "大门口.avi", config_name, result_name, 0, 8, choice, true);
+			//boost::thread test1(testmultithread,"F:/TongHaoTest2/", "食堂1.avi", config_name, result_name, 0, 8, choice, true);
 			test1.join();
 			cout<<"finish step "<<choice<<endl;
 		}

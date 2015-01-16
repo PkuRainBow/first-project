@@ -10,7 +10,7 @@ class UserVideoAbstraction{
 public:
 	VideoAbstraction *userVB;
 public:
-	__declspec(dllexport) UserVideoAbstraction(const char* inputpath, const char* out_path, const char* log_path, const char* config_path,const char* index_path,const char* videoname, const char* midname, int scale);
+	__declspec(dllexport) UserVideoAbstraction(const char* inputpath, const char* out_path, const char* log_path, const char* config_path,const char* index_path,const char* videoname, const char* midname, float scale);
 	__declspec(dllexport) UserVideoAbstraction();
 	__declspec(dllexport) ~UserVideoAbstraction();
 

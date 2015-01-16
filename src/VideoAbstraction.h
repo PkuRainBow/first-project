@@ -42,7 +42,7 @@ public:
 	VideoAbstraction();
 	void init();
 	//~VideoAbstraction();
-	int scaleSize;
+	float scaleSize;
 	int framePerSecond;				//帧数/秒
 	int maxLength;					//视频的最长长度
 	int curMaxLength;					//当前处理的视频的最长长度
