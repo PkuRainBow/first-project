@@ -18,7 +18,7 @@ VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log
 	Indexpath=index_path;
 	InputName=videoname;
 	MidName=midname;
-	thres=1000;
+	thres=100;
 	videoCapture.open(inputpath+videoname);
 	frameHeight=videoCapture.get(CV_CAP_PROP_FRAME_HEIGHT)/scaleSize;
 	frameWidth=videoCapture.get(CV_CAP_PROP_FRAME_WIDTH)/scaleSize;
@@ -48,7 +48,7 @@ void VideoAbstraction::init(){
 	maxLength=-1;
 	maxLengthToSpilt=300;
 	sum=0;
-	thres=1000;
+	thres=100;
 	currentLength=0;
 	tempLength=0;
 	noObjectCount=0;
@@ -102,9 +102,11 @@ void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){
 	vector<vector<Point>> contors,newcontors;
 	vector<Point> hull;
 	findContours(mask,contors,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE); //找到所有的contour 闭包
+	//cout<<"xinge_contors"<<contors.size()<<endl;
 	//
 	vector<vector<Point>>::const_iterator itc=contors.begin();
 	//过滤掉过小的闭包，其他闭包全部存放到 newcontors 中
+	//cout<<"xinge"<<objectarea<<endl;
 	while(itc!=contors.end()){
 		if(contourArea(*itc)<objectarea){
 		//if(itc->size()<thres){
@@ -452,11 +454,10 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 
 
 void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前背景分离函数
-	//Mat currentFrame;
-	//if(scaleSize > 1)
-	//	pyrDown(inputFrame, currentFrame, Size(frameWidth,frameHeight));
-	//else
-	//	inputFrame.copyTo(currentFrame);
+	//cout<<"ori_size"<<currentFrame.rows<<"  "<<currentFrame.cols<<endl;
+	if(scaleSize != 1)
+		resize(currentFrame, currentFrame, Size(frameWidth,frameHeight));
+	//cout<<"Size"<<frameHeight<<"   "<<frameWidth<<endl;
 
 	if(frameIndex==50)								//如果中间文件原来已经存在，则执行清空操作
 		ofstream file_flush(Configpath+MidName, ios::trunc);
@@ -477,6 +478,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 		}
 		imwrite(InputName+"background.jpg",backgroundImage);
 	}
+
 	else{										//50帧之后的图像需要正常处理
 		if(frameIndex%2==0){						//更新前背景信息的频率，表示每5帧做一次前背景分离
 			if(useGpu){
@@ -491,7 +493,10 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 				gForegroundMask.copyTo(currentMask);		//复制运动的凸包序列到 currentMask 中
 			}
 			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
+			//freopen("exe.txt","a",stdout);
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
+			//cout<<sum<<endl;
+			//cout<<"lalala"<<thres/(scaleSize*scaleSize)<<" "<<thres<<" "<<scaleSize<<endl;
 			//整个画面
 			if(sum>(thres/(scaleSize*scaleSize))){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				//cout<<"points number : "<<sum<<endl;
@@ -589,6 +594,16 @@ void VideoAbstraction::saveConfigInfo(){						//保存所有凸包运动序列�
 	ff.close();
 }
 
+void VideoAbstraction::loadObjectCube(vector<vector<Point>>& contors){ 
+	ifstream file(Configpath+MidName);
+	string temp;
+	contors.clear();
+	for(int i=0; i<loadIndex; i++) {
+		getline(file, temp, '#');
+	}
+	contors=stringToContors(temp);
+}
+
 void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指定事件序列号范围内的运动帧导入 partToCompound 和 partToCopy 中
 	partToCompoundNum=0;
 	partToCopyNum=0;
@@ -642,6 +657,7 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 }
 
 void  VideoAbstraction::LoadConfigInfo(){		//不能分阶段处理 -- 读取中间文件中的运动起始信息
+	EventNum=0;
 	ifstream file(Configpath+MidName);
 	string temp;
 	for(int i=0; i<ObjectCubeNumber; i++) {		
@@ -655,12 +671,14 @@ void  VideoAbstraction::LoadConfigInfo(){		//不能分阶段处理 -- 读取中�
 		file>>end;
 		frame_start.push_back(start);
 		frame_end.push_back(end);
+		EventNum++;
 	}
 	file.close();
 }
 
 void  VideoAbstraction::LoadConfigInfo(int frameCountUsed){  //用于分阶段处理 ---  需要传入有效帧的帧数信息
 	this->ObjectCubeNumber=frameCountUsed;
+	this->EventNum=0;
 	ifstream file(Configpath+MidName);
 	string temp;
 	for(int i=0; i<ObjectCubeNumber; i++) {	
@@ -674,6 +692,7 @@ void  VideoAbstraction::LoadConfigInfo(int frameCountUsed){  //用于分阶段�
 		file>>end;
 		frame_start.push_back(start);
 		frame_end.push_back(end);
+		EventNum++;
 	}
 	file.close();
 }
@@ -808,6 +827,7 @@ void VideoAbstraction::compound(string path){
 	int testcount=0;
 	Outpath=path;									//获取合成文件的输出路径以及完整的文件名	videoCapture.open(Inputpath+InputName);			//合成操作前，需要提取背景图片信息保存到backgroundImage中
 	backgroundImage=imread(InputName+"background.jpg");
+
 	//cout<<Outpath<<endl;
 	//cout<<"frame width "<<frameWidth<<endl;
 	//cout<<"frame height "<<frameHeight<<endl;
@@ -924,10 +944,12 @@ void VideoAbstraction::compound(string path){
 		sumLength+=(curMaxLength-startCompound);	
 		for(int j=startCompound;j<curMaxLength;j++)
 		{
+			testcount++;
 			bool haveFrame=false;
 			Mat resultMask, tempMask;
 			//初始化 indexMat
-			Mat indexMat(Size(frameWidth*scaleSize,frameHeight*scaleSize), CV_8U);
+			//Mat indexMat(Size(frameWidth*scaleSize,frameHeight*scaleSize), CV_8U);
+			Mat indexMat(Size(frameWidth,frameHeight), CV_8U);
 			int earliest=INT_MIN,earliestIndex=-1;
 			for(int i=0;i<synopsis;i++){	//寻找序列中开始时间最早的作为背景
 				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j){
@@ -946,6 +968,7 @@ void VideoAbstraction::compound(string path){
 				//resize
 				//videoCapture>>currentFrame;
 				videoCapture>>currentFrame;
+				resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 				//if(scaleSize > 1)		
 				//	pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
 				//else
@@ -982,14 +1005,16 @@ void VideoAbstraction::compound(string path){
 					//resize
 					//videoCapture>>currentFrame;
 					videoCapture>>currentFrame;
+					resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 					//if(scaleSize > 1)		
 					//	pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
 					//else
 					//	tempFrame.copyTo(currentFrame);
 					//resize
 					currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
+					saveContorsOfResultFrameToFile(testcount, currentMask, (i+ss*motionToCompound));
 					//pyrUp(tempMask, currentMask, Size(frameWidth*scaleSize,frameHeight*scaleSize));
-					writeMask(currentMask, indexMat, (i+ss*motionToCompound)%256);
+					//writeMask(currentMask, indexMat, (i+ss*motionToCompound)%256);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
 				}
@@ -1030,7 +1055,6 @@ void VideoAbstraction::compound(string path){
 					}
 				}
 			}		
-			//testcount++;
 			//string filepath=Indexpath+InputName+"/";
 			//fstream testfile;
 			//testfile.open(filepath, ios::in);
@@ -1055,6 +1079,7 @@ void VideoAbstraction::compound(string path){
 				for(int j=0; j<length; j++){
 					videoCapture.set(CV_CAP_PROP_POS_FRAMES,j+base_index);
 					videoCapture>>currentResultFrame;
+					resize(currentResultFrame, currentResultFrame, Size(frameWidth, frameHeight));
 					//put the time tag info into the readed frame...
 					vector<Point> info;
 					vector<vector<Point>> re_contours;	
@@ -1133,4 +1158,160 @@ void VideoAbstraction::writeMask(Mat& input, Mat& output, int index){
 				//ptr_output[jj]=index;
 		}
 	}
+}
+
+void VideoAbstraction::getKeyFrame(string keyframe_path){
+	create_path(keyframe_path);
+	VideoCapture videoread;
+	videoread.open(Inputpath+InputName);
+	Mat keyframes;
+	Mat keymask;
+	int s1,s2,s3,e1,e2,e3,frame_index;
+	vector<vector<Point>> keycontors;
+	loadIndex=0;
+	for(int i=0; i<EventNum; i++){
+		//read the key frames
+		//frame_index=(frame_start[i]+frame_end[i])/2;
+		frame_index=frame_start[i];
+		loadIndex+=frame_index-frame_start[i]+1;
+		videoread.set(CV_CAP_PROP_POS_FRAMES, frame_index);
+		videoread>>keyframes;
+		loadObjectCube(keycontors);
+		MarkContours(keyframes, keycontors);
+		//put the time tag on the frame
+		s1=frame_start[i]/3600;
+		s2=(frame_start[i]%3600)/60;
+		s3=frame_start[i]%60;
+		e1=frame_end[i]/3600;
+		e2=(frame_end[i]%3600)/60;
+		e3=frame_end[i]%60;
+		Point mid(keyframes.cols/10, (keyframes.rows*9)/10);
+		putText(keyframes,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.6, Scalar(0,255,0),1);
+		string filename=boost::lexical_cast<string>(i)+".jpg";
+		imwrite(keyframe_path+filename, keyframes);
+		loadIndex-=frame_index-frame_start[i]+1;
+		loadIndex+=frame_end[i]-frame_start[i]+1;
+	}
+}
+
+void VideoAbstraction::MarkContours(Mat& mat, vector<vector<Point>>& contours){
+	for (int i=0;i<contours.size();i++)
+	{
+		int x_min=9999999;
+		int y_min=9999999;
+		int x_max=0;
+		int y_max=0;
+
+		for (int j=1;j<contours[i].size();j++)
+		{
+			if (x_min>contours[i][j].x)
+			{
+				x_min=contours[i][j].x;
+			}
+			if (y_min>contours[i][j].y)
+			{
+				y_min=contours[i][j].y;
+			}
+			if (x_max<contours[i][j].x)
+			{
+				x_max=contours[i][j].x;
+			}
+			if (y_max<contours[i][j].y)
+			{
+				y_max=contours[i][j].y;
+			}
+		}
+		rectangle(mat,Point(x_min,y_min),Point(x_max,y_max),CV_RGB(0,255,0),2);
+	}
+}
+
+void VideoAbstraction::create_path(string path){
+	fstream testfile;
+	testfile.open(path, ios::in);
+	if(!testfile){
+		boost::filesystem::path dir(path);
+		boost::filesystem::create_directories(dir);
+	}
+}
+
+std::string VideoAbstraction::getTempFilePath(int frame_num){
+	std::string fileName;
+	create_path(Inputpath+"Replay/"+InputName+"/");
+	string filepath=Inputpath+"Replay/"+InputName+"/";
+	//std::sprintf(fileName, "%s%d.txt", filepath, frame_Num);
+	char num[10];
+	fileName = filepath + itoa(frame_num, num, 10) + ".txt";
+	return fileName;
+}
+
+bool VideoAbstraction::saveContorsOfResultFrameToFile(int frame_Num, cv::Mat& mask, int indexOfMask){
+	std::string fileName = getTempFilePath(frame_Num);
+	std::ofstream outfile(fileName, ios::ate);
+    //freopen("exe.txt","a",stdout);
+	cout<<"replay"<<fileName<<"  "<<frame_Num<<"   "<<indexOfMask<<endl;
+	std::vector<std::vector<cv::Point> >contours;
+	cv::findContours(mask, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+	outfile << indexOfMask << " " << contorsToString(contours) << std::endl;
+	outfile.close();
+	return true;
+}
+
+
+cv::Mat VideoAbstraction::loadContorsOfResultFrameFromFile(int frame_Num, int width, int height, vector<int>& lookupTable){
+	lookupTable.clear();
+	lookupTable.push_back(-1);//
+
+	cv::Mat resultMask(width, height, CV_8UC1, Scalar::all(0));
+	std::string fileName = getTempFilePath(frame_Num);
+	std::ifstream infile(fileName);
+
+	std::string line;
+	while (std::getline(infile, line))
+	{
+		if (!line.size())
+			continue;
+		std::stringstream ss(line);
+		std::string sContors;
+		int indexOfMask = -1;
+		ss >> indexOfMask;//每行第一个数值为事件标号，后面为Contors定点坐标
+		if (indexOfMask != lookupTable.back())
+			lookupTable.push_back(indexOfMask);
+		std::getline(ss, sContors);
+		sContors = sContors.substr(1);
+		std::vector<std::vector<cv::Point> >contours = stringToContors(sContors);
+		cv::Mat mask(width, height, CV_8UC1, Scalar::all(0));
+		cv::drawContours(mask, contours, -1, Scalar(255), -1);
+		restoreMaskOfFram(resultMask, mask, lookupTable.size());
+	}
+	infile.close();
+	return resultMask;
+}
+
+bool VideoAbstraction::restoreMaskOfFram(cv::Mat& FrameMask, cv::Mat& oneContors, int index){
+	int nc = FrameMask.cols;
+	int nl = FrameMask.rows;
+	if (oneContors.cols != nc || oneContors.rows != nl)
+		return false;
+	if (FrameMask.isContinuous() && oneContors.isContinuous())
+	{
+		nc = nc * nl;
+		nl = 1;
+	}
+	for (int j = 0; j < nl; ++j)
+	{
+		uchar* c_data = oneContors.ptr<uchar>(j);
+		uchar* m_data = FrameMask.ptr<uchar>(j);
+		for (int i = 0; i < nc; ++i)
+		{
+			if (*c_data++ != 0)
+			{
+				*m_data++ = index * 100;
+			} else {
+				m_data++;
+
+			}
+
+		}
+	}
+	return true;
 }

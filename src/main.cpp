@@ -12,7 +12,7 @@
 
 #define DIV_NUMBER 9
 #define MAX_INDEX_COUNT 300
-#define MIN_AREA 500
+#define MIN_AREA 100
 
 //declaration
 extern int readFrameLog(string logname);
@@ -20,6 +20,7 @@ extern void readAreaLog(string logname, int &base_x, int &base_y);
 extern Mat MultiImage(const vector<Mat>& SrcImg_V, Size ImgMax_Size);
 extern void video_play(long index);
 extern void create_path(string path);
+extern string int2string(int _Val);
 static void bar_callback(int index,void* userdata);
 
 //variable definition
@@ -170,28 +171,28 @@ static void mouseSnipShot(int event, int x, int y, int flags, void* userdata)
 void testmultithread(string inputpath, string videoname, string midname, string outputname, int& frameCount, int CompoundCount, int scale, int stage, bool readlog){
 //void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int scale, int stage){
 	time_t start_time,end_time;
-	
 	start_time=time(NULL);
-
 	testVideoName=videoname;
 	//set all the necessary paths
 	string path=inputpath;
 	string out_path=path+"OutputVideo/";
 	string config_path=path+"Config/";
 	string index_path=path+"indexMat/";
+	string keyframe_path=path+"KeyFrame/";
 	log_path=path+"Log/";
 	//create the path if not exist
 	create_path(out_path);
 	create_path(log_path);
 	create_path(config_path);
 	create_path(index_path);
+	create_path(keyframe_path);
 	
 	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
 	user->UsersetGpu(true);
 	user->UsersetIndex(false);
 	user->UsersetMinArea(MIN_AREA/(scale*scale));
-	
+
 	int test = stage;
 	ofstream ff(log_path+"TimeLog.txt", ofstream::app);
 	if(test==1){
@@ -269,7 +270,6 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 			frCount=readFrameLog(log_path+"FrameLog.txt");
 		else
 			frCount=frameCount;
-		//int frCount=frameCount;
 		string t1=inputpath,t2=midname,t=videoname;
 		ori_video=inputpath+t;
 		string t3 = outputname;
@@ -302,60 +302,38 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		currentFrameIndex=0;
 		string filepath=index_path+t+"/";
 		namedWindow("video");
-		setMouseCallback("video",mouseRecover);
+		//setMouseCallback("video",mouseRecover);
+
 		abstract_video.read(image);
 		imshow("video",image);
 		waitKey(0);
 		abstract_video.open(t3);
+
+		vector<int> loopuptable;
 		while(abstract_video.read(image)){
 			currentFrameIndex++;	
-			string filename=boost::lexical_cast<string>(currentFrameIndex)+".bmp";
-			index_image=imread(filepath+filename);
+			//string filename=boost::lexical_cast<string>(currentFrameIndex)+".bmp";
+			//index_image=imread(filepath+filename);
 			imshow("video",image);
+			Mat temp = user->userVB->loadContorsOfResultFrameFromFile(currentFrameIndex, image.rows, image.cols, loopuptable);
+			imshow("temp", temp);
+			waitKey(10);
 			//waitKey(30);
 			//imshow("index", index_image);
 			//setMouseCallback("video",mouseRecover);
-			int key = waitKey(30); 
-			if(key==27)
-				waitKey(0);
+			//int key = waitKey(30); 
+			//if(key==27)
+			//	waitKey(0);
 		}
 	}
 	else if(test==4){
-		state="test the snip-shot function";
-		namedWindow(window_name);
-		setMouseCallback(window_name,mouseSnipShot);//设置鼠标回调函数
-		SubPlot=Size(3,3);//最终快照显示图像为3*3 矩阵的九张图像
-		string t1=inputpath,t2=videoname;
-		string t3 = t1+t2;
-		capture.open(t3);
-		//检测是否正常打开:成功打开时，isOpened返回ture
-		if(!capture.isOpened())
-		{
-			cout<<"fail to open!"<<endl;
-		}
-		double totalFrameNumber = capture.get(CV_CAP_PROP_FRAME_COUNT);//获取整个帧数
-		cout<<"整个视频共"<<totalFrameNumber<<"帧"<<endl;
-		bar_index=0;//进度条起始位置
-		int number_per_div=(int)totalFrameNumber/DIV_NUMBER;//计算两个快照间的间隔帧数
-		vector<Mat> images(DIV_NUMBER);//保存快照
-		video_index=vector<long>(DIV_NUMBER);
-		for (int i=0;i<DIV_NUMBER;i++)
-		{
-			long now_frame=number_per_div*i;//计算第i张快照 对应的帧数
-			video_index[i]=now_frame;
-
-			capture.set(CV_CAP_PROP_POS_FRAMES,now_frame);//设置读取这一帧
-
-			Mat zhong;
-			capture.read(zhong);//读取快照
-			zhong.copyTo(images[i]);
-			zhong.release();
-		}
-		Mat result_image=MultiImage(images, Size(images[0].cols,images[0].rows));
-		imshow(window_name,result_image);
-		waitKey(0);
-		capture.release();
-		result_image.release();
+		string t1=inputpath,t2=midname,t3=videoname,temp;
+		int frCount;
+		if(readlog)
+			frCount=readFrameLog(log_path+"FrameLog.txt");
+		else
+			frCount=frameCount;
+		user->UserGetKeyFrame(keyframe_path+t3+"/",frCount);
 	}
 	else{
 		//check or debug 
@@ -368,64 +346,33 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 
 
 int main(){
-	// boost thread control ...
-	
-	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
-						"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
-						"Cam3.avi", "Cam4.avi"};
-
-	int framecount1[] = {48374, 36675, 3008, 994, 3002, 4094, 7942, 25967, 17447, 2973, 6618, 5029, 4918, 5100, 14100, 5522, 9860};
-
-	string testset2[] = {"20110915_14-17-35.avi","20111202_082711.avi","20111202_101331.avi","大门口.avi","高档小区.avi","金融.avi","卡口 .avi",
-						"三楼办公室.avi", "食堂1.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi"};
-
-	int framecount2[] = {31712, 68141, 50912, 12530, 1581, 1349, 4980, 38130, 623, 1357, 895, 3093, 838, 4452, 1231};
-	/* Tong Hao Test !!! */
-	/*	Test Set -1- */
-	//for(int i=0; i<testset1->size(); i++){	
-	//	string result_name="result_"+testset1[i];
-	//	string config_name="config_"+boost::lexical_cast<string>(i);
-	//	boost::thread test1(testmultithread,"F:/TongHaoTest1/", testset1[i], config_name, result_name, framecount[i], 8, 1, 1);
-	//	test1.join();
-	//	cout<<"finished..."<<endl;
-	//}
-
-	//int all=testset1->size()-1;
-	//for(int i=0; i<testset1->size(); i++){	
-	//	cout<<testset1[i]<<endl;
-	//	string result_name="result_"+testset1[i];
-	//	string config_name="config_"+boost::lexical_cast<string>(i);
-	//	boost::thread test2(testmultithread,"F:/TongHaoTest1/", testset1[i], config_name, result_name, framecount[i], 8, 1, 2);
-	//	test2.join();
-	//	cout<<"finished..."<<endl;
-	//}
-
-	/*	Test Set -2- */
-	//for(int i=0; i<testset2->size(); i++){	
-	//	string result_name="result_"+testset2[i];
-	//	string config_name="config_"+boost::lexical_cast<string>(i);
-	//	boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[i], config_name, result_name, framecount[i], 8, 1, 1);
-	//	test1.join();
-	//	cout<<"finished..."<<endl;
-	//}
-	//for(int i=0; i<1; i++){	
-	//	cout<<testset2[i]<<endl;
-	//	string result_name="result_"+testset2[i];
-	//	string config_name="config_"+boost::lexical_cast<string>(i);
-	//	boost::thread test2(testmultithread,"F:/TongHaoTest2/", testset2[i], config_name, result_name, framecount2[i], 8, 1, 2);
-	//	test2.join();
-	//	cout<<"finished..."<<endl;
-	//}
-
-	string inputvideo="大门口.avi";
-	//string inputvideo="testvideo.avi";
-	cout<<inputvideo<<endl;
-	string result_name="result_"+inputvideo;
+	cout<<"***********************************************************************************"<<endl;
+	cout<<"\t"<<"Using Guidance "<<endl;
+	cout<<"\t"<<"Please input 1 / 2 / 3 / 4"<<endl;
+	cout<<"\t"<<"1:   subtract the background and foreground of the input video"<<endl;
+	cout<<"\t"<<"2:   compound the convex point sequence to produce the abstracted video"<<endl;
+	cout<<"\t"<<"3:   you can replay the seleted object's event full process"<<endl;
+	cout<<"\t"<<"4:   you can view 9 snip-shots of the original video"<<endl;
+	cout<<"\t"<<"others:   Exit !"<<endl;
+	cout<<"*********************************************************************************"<<endl;
+	string result_name="result_test.avi";
 	string config_name="config_test";
-	boost::thread test2(testmultithread,"F:/TongHaoTest2/", inputvideo, config_name, result_name, 0, 8, 1, 2, true);
-	test2.join();
-	cout<<"finished..."<<endl;
+	//boost::thread test1(testmultithread,"test/", "test.avi", config_name, result_name, 1025, 8, 2, 3);
 
+	int choice;
+	bool flag=true;
+	while(flag){
+		cout<<"Please input the choice No. : ";
+		cin>>choice;
+		if(choice== 1 || choice == 2 || choice == 3 || choice == 4){
+			//boost::thread test1(testmultithread,"F:/TongHaoTest2/", "testvideo.avi", config_name, result_name, 0, 8, 1, choice, true);
+			boost::thread test1(testmultithread,"F:/TongHaoTest2/", "大门口.avi", config_name, result_name, 0, 8, 1, choice, true);
+			test1.join();
+			cout<<"finish step "<<choice<<endl;
+		}
+		else
+			return 0;
+	}
 	return 0;
 }
 
@@ -492,72 +439,6 @@ void readAreaLog(string logname, int &base_x, int &base_y){
 	}
 }
 
-Mat MultiImage(const vector<Mat>& SrcImg_V, Size ImgMax_Size)
-{
-	/*
-	*函数功能：	将多张图像拼接到一张图像上
-	*SrcImg_v:	需要拼接的图像向量
-	*ImgMax_Size:	最总显示的图像的大小
-	*/
-	Mat return_image(SrcImg_V[0].rows*SubPlot.height,SrcImg_V[0].cols*SubPlot.width,SrcImg_V[0].type());//初始化返回图像
-
-	int heng=SubPlot.height;//最终图像显示多少行
-	int zong=SubPlot.width;//最终图像显示多少列
-
-	int width=SrcImg_V[0].cols;
-	int height=SrcImg_V[0].rows;
-
-	int num=0;//当前图像的编号
-	for (int i=0;i<heng;i++)//纵向循环 每一行
-	{
-		for (int j=0;j<zong;j++)//横向循环 每一列
-		{	
-			int start_x=(num%zong)*width;//小图在大图中 左上角的横坐标
-			int start_y=(num/zong)*height;//小图在大图中 左上角的纵坐标
-
-			SrcImg_V[num].copyTo(return_image(Rect(start_x,start_y,width,height)));
-			num++;//图像编号加一
-		}
-	}
-	resize(return_image,return_image,ImgMax_Size);	
-	small_width=ImgMax_Size.width/zong;//计算每一个小图的宽度
-	small_height=ImgMax_Size.height/heng;//计算每个小图的高度
-	return return_image;
-}
-
-static void bar_callback(int index,void* userdata)
-{
-	capture.set(CV_CAP_PROP_POS_FRAMES,index);
-	bar_index=index;  
-}
-
-void video_play(long index)
-{
-	//视频播放函数
-	Mat zhong;
-	namedWindow(window_play);
-
-	capture.set(CV_CAP_PROP_POS_FRAMES,index);
-	double totalFrameNumber = capture.get(CV_CAP_PROP_FRAME_COUNT);//获取整个帧数
-	double fps=capture.get(CV_CAP_PROP_FPS);
-	if (totalFrameNumber>0)
-	{
-		cv::createTrackbar("position",window_play,&bar_index,totalFrameNumber,bar_callback);//创建进度条，bar_callback是回调函数
-		bar_index=index;
-	}
-
-	while(capture.read(zhong))
-	{
-		bar_index++;
-		setTrackbarPos("position",window_play,bar_index);//
-		imshow(window_play,zhong);
-		//waitKey(1000.0/fps);//间隔时间可以调整，这样显示会比实际的慢
-		waitKey(20);//间隔时间可以调整，这样显示会比实际的慢
-	}
-	zhong.release();
-	cv::destroyWindow(window_play);
-}
-
 void create_path(string path){
 	fstream testfile;
 	testfile.open(path, ios::in);
@@ -565,4 +446,10 @@ void create_path(string path){
 		boost::filesystem::path dir(path);
 		boost::filesystem::create_directories(dir);
 	}
+}
+
+string int2string(int _Val){
+	char _Buf[100];
+	sprintf(_Buf, "%d", _Val);
+	return (string(_Buf));
 }

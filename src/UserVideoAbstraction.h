@@ -7,7 +7,7 @@ using namespace std;
 using namespace cv;
 
 class UserVideoAbstraction{	
-private:
+public:
 	VideoAbstraction *userVB;
 public:
 	__declspec(dllexport) UserVideoAbstraction(const char* inputpath, const char* out_path, const char* log_path, const char* config_path,const char* index_path,const char* videoname, const char* midname, int scale);
@@ -23,4 +23,5 @@ public:
 	__declspec(dllexport) void UsersetROI(Rect rectroi);											// 设置是否选择感兴趣的区域
 	__declspec(dllexport) void UsersetIndex(bool isindex);
 	__declspec(dllexport) void UsersetMinArea(int area);
+	__declspec(dllexport) void UserGetKeyFrame(string filepath, int frameCount);
 };

@@ -16,7 +16,7 @@ UserVideoAbstraction::UserVideoAbstraction(const char* inputpath, const char* ou
 UserVideoAbstraction::UserVideoAbstraction(){};
 
 UserVideoAbstraction::~UserVideoAbstraction(){
-	userVB->~VideoAbstraction();
+	//userVB->~VideoAbstraction();
 	delete userVB;
 };
 
@@ -74,4 +74,11 @@ void UserVideoAbstraction::UsersetIndex(bool isindex){
 
 void UserVideoAbstraction::UsersetMinArea(int minarea){
 	userVB->objectarea=minarea;
+	cout<<"area"<<userVB->objectarea;
 }
+
+void UserVideoAbstraction::UserGetKeyFrame(string filepath, int frameCount){
+	userVB->LoadConfigInfo(frameCount);
+	userVB->getKeyFrame(filepath);
+}
+
