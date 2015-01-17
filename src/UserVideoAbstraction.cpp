@@ -73,8 +73,11 @@ void UserVideoAbstraction::UsersetIndex(bool isindex){
 }
 
 void UserVideoAbstraction::UsersetMinArea(int minarea){
+	userVB->thres=minarea;
+}
+
+void UserVideoAbstraction::UsersetSingleMinArea(int minarea){
 	userVB->objectarea=minarea;
-	cout<<"area"<<userVB->objectarea;
 }
 
 void UserVideoAbstraction::UserGetKeyFrame(string filepath, int frameCount){

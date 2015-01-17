@@ -10,9 +10,9 @@
 #include "UserVideoAbstraction.h"
 #include <time.h>
 
-#define DIV_NUMBER 9
-#define MAX_INDEX_COUNT 300
-#define MIN_AREA 200  //test use 200
+#define MAX_INDEX_COUNT 1000
+#define SINAGLE_MIN_AREA 100  //test use 200
+#define MIN_AREA 200
 
 //declaration
 extern int readFrameLog(string logname);
@@ -28,7 +28,6 @@ string testVideoName;
 string log_path;
 string state;
 //snap-shot 
-
 VideoCapture capture;
 Size SubPlot;
 char* window_name="img";
@@ -53,6 +52,8 @@ vector<int> event_start;
 vector<int> event_end;
 vector<int> event_length;
 int event_count[MAX_INDEX_COUNT];
+
+vector<int> loopuptable;
 
 /* calling back event function */
 //ROI selection
@@ -100,22 +101,19 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 		int ID=0, maxCount=0,baseIndex=0;
 		uchar *p;
 		p=index_image.ptr<uchar>(0);
-		baseIndex=(int)p[0];
-		cout<<"base Index"<<baseIndex<<endl;
 		//waitKey(0);
 		selectarea.width=x-selectarea.x;
 		selectarea.height=y-selectarea.y;
-		
 		Mat destmat;
 		index_image(selectarea).copyTo(destmat);
 		for(int i=0; i<MAX_INDEX_COUNT; i++) event_count[i]=0;
 		for(int i=0; i<destmat.rows; i++){
 			p=destmat.ptr<uchar>(i);
 			for(int j=0; j<destmat.cols; j++){
-				if((int)p[j] > 100)	event_count[255-(int)p[j]]++;
-				//if((int)p[j] > 100)	event_count[(int)p[j]]++;
+				event_count[loopuptable[(int)p[j]]]++;
 			}
 		}
+
 		for(int i=0; i<MAX_INDEX_COUNT; i++){
 			if(event_count[i] > maxCount){
 				ID = i;
@@ -143,22 +141,6 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 	}
 	return;  
 }
-// snip-shot 
-static void mouseSnipShot(int event, int x, int y, int flags, void* userdata)
-{  
-	switch(event)  
-	{  
-	case CV_EVENT_LBUTTONDOWN:
-		//get the selected video's position
-		int heng=y/small_height;
-		int zong=x/small_width;
-		long index=heng*SubPlot.width+zong;
-		video_play(video_index[index]);
-		break;
-	}  
-	return;  
-} 
-
 
 /** test thread **/
 /*****************************************************************/
@@ -199,12 +181,13 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	{
 		scale=((float)video_width)/360;
 	}
-	scale=1;
+	//scale=1;
 
 	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
 	user->UsersetGpu(true);
 	user->UsersetIndex(false);
+	user->UsersetSingleMinArea(SINAGLE_MIN_AREA/(scale*scale));
 	user->UsersetMinArea(MIN_AREA/(scale*scale));
 
 	int test = stage;
@@ -258,6 +241,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		ff.close();
 	}
 	else if(test==2){
+		//boost::filesystem::remove("F:/TongHaoTest2/Replay");
 		state="compound the result video";
 		string t3 = out_path+outputname;
 		if(setROI){
@@ -322,22 +306,22 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		imshow("video",image);
 		waitKey(0);
 		abstract_video.open(t3);
+		
 
-		vector<int> loopuptable;
 		while(abstract_video.read(image)){
 			currentFrameIndex++;	
 			//string filename=boost::lexical_cast<string>(currentFrameIndex)+".bmp";
 			//index_image=imread(filepath+filename);
 			imshow("video",image);
-			Mat temp = user->userVB->loadContorsOfResultFrameFromFile(currentFrameIndex, image.rows, image.cols, loopuptable);
-			imshow("temp", temp);
-			waitKey(10);
-			//waitKey(30);
+			index_image = user->userVB->loadContorsOfResultFrameFromFile(currentFrameIndex, image.rows, image.cols, loopuptable);
+			//Mat temp = user->userVB->loadContorsOfResultFrameFromFile(currentFrameIndex, image.rows, image.cols, loopuptable);
+			//imshow("temp", temp);
+			waitKey(30);
 			//imshow("index", index_image);
-			//setMouseCallback("video",mouseRecover);
-			//int key = waitKey(30); 
-			//if(key==27)
-			//	waitKey(0);
+			setMouseCallback("video",mouseRecover);
+			int key = waitKey(30); 
+			if(key==27)
+				waitKey(0);
 		}
 	}
 	else if(test==4){
@@ -391,13 +375,15 @@ int main(){
 	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
 		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
 		"Cam3.avi", "Cam4.avi"};
-	string testset2[] = {"testvideo.avi", "20110915_14-17-35.avi","20111202_082711.avi","20111202_101331.avi","大门口.avi","高档小区.avi","金融.avi","卡口 .avi",
+	string testset2[] = {"testvideo.avi", "高档小区.avi", "20110915_14-17-35.avi","20111202_082711.avi","20111202_101331.avi","大门口.avi","金融.avi","卡口 .avi",
 		"三楼办公室.avi", "食堂1.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi"};
 
-	int testno=0;
+	int testno=0,choice;
 	string result_name="result_"+testset2[testno];
 	string config_name="config_"+testset2[testno];
-	boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, 2, true);
+	cout<<"input your choice: ";
+	cin>>choice;
+	boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, choice, true);
 	test1.join();
 	cout<<"finished..."<<endl;
 

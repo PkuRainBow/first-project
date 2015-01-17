@@ -2,14 +2,16 @@
 //user: PianoCoder
 //Create date:
 //Class name: VideoAbstraction
-//Discription:  implement the background/foreground subtraction and the video compounding
+//Discription:  implement the background/foreground subtraction and the video 255ing
 //Update: 2014/01/07
 //****************************************
 #include "VideoAbstraction.h"
 //
 VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname, int size){
+	init();
 	scaleSize=size;
 	objectarea=100/(scaleSize*scaleSize);
+	thres=1000;
 	useGpu=true;
 	Inputpath=inputpath;
 	Outpath=out_path;
@@ -18,13 +20,11 @@ VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log
 	Indexpath=index_path;
 	InputName=videoname;
 	MidName=midname;
-	thres=2000;
 	videoCapture.open(inputpath+videoname);
 	frameHeight=videoCapture.get(CV_CAP_PROP_FRAME_HEIGHT)/scaleSize;
 	frameWidth=videoCapture.get(CV_CAP_PROP_FRAME_WIDTH)/scaleSize;
 	framePerSecond=videoCapture.get(CV_CAP_PROP_FPS);
 	useROI=false;
-	init();
 }
 
 VideoAbstraction::VideoAbstraction(){
@@ -67,14 +67,14 @@ void VideoAbstraction::freeObject(){
 	gForegroundMask.release();	
 	gBackgroundImg.release();	
 	currentMask.release();	
-	vector<ObjectCube>().swap(partToCompound);	
+	vector<ObjectCube>().swap(partToCompound);
+	vector<ObjectCube>().swap(partToCopy);
 	vector<Mat>().swap(compoundResult);
 	vector<Mat>().swap(indexs);
 	vector<Mat>().swap(indexe);
 	vector<int>().swap(frame_start);
 	vector<int>().swap(frame_end); 
 }
-
 
 string VideoAbstraction::int2string(int _Val){
 	char _Buf[100];
@@ -89,24 +89,15 @@ void VideoAbstraction::postProc(Mat& frame){
 }
 
 void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){  
-	//GaussianBlur(mask,mask,Size(5,5),0,0);
-	//GaussianBlur(mask,mask,Size(5,5),0,0);
-	//imshow("erode1",mask);
 	Mat ele(2,4,CV_8U,Scalar(1));
 	erode(mask,mask,ele);// 默认时，ele 为 cv::Mat() 形式  参数扩展（image， eroded, structure, cv::Point(-1,-1,), 3） 
 	//右侧2个参数分别表示 是从矩阵的中间开始，3表示执行3次同样的腐蚀操作
 	dilate(mask,mask,ele);
-	//imshow("erode2",mask);
-	//waitKey(0);
-
 	vector<vector<Point>> contors,newcontors;
 	vector<Point> hull;
 	findContours(mask,contors,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE); //找到所有的contour 闭包
-	//cout<<"xinge_contors"<<contors.size()<<endl;
-	//
 	vector<vector<Point>>::const_iterator itc=contors.begin();
 	//过滤掉过小的闭包，其他闭包全部存放到 newcontors 中
-	//cout<<"xinge"<<objectarea<<endl;
 	while(itc!=contors.end()){
 		if(contourArea(*itc)<objectarea){
 		//if(itc->size()<thres){
@@ -124,13 +115,15 @@ void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){
 	vector<vector<Point>>().swap(newcontors);
 }
 
-vector<bool> matToVector(Mat &input){   //############   bug place  ############
+vector<bool> matToVector(Mat &input){
 	int step=input.step,step1=input.elemSize();
 	uchar* indata=input.data;
 	int row=input.rows,col=input.cols;
 	vector<bool> ret;
-	for(int i=0;i<row;i++){
-		for(int j=0;j<col;j++){
+	for(int i=0;i<row;i++)
+	{
+		for(int j=0;j<col;j++)
+		{
 			ret.push_back(*(indata+i*step+j*step1));
 		}
 	}
@@ -140,7 +133,8 @@ vector<bool> matToVector(Mat &input){   //############   bug place  ############
 Mat vectorToMat(vector<bool> &input,int row,int col){
 	Mat re(row,col,CV_8U,Scalar::all(0));
 	int step=re.step,step1=re.elemSize();
-	for(int i=0;i<input.size();++i){
+	for(int i=0;i<input.size();++i)
+	{
 		*(re.data+i*step1)=(input[i]?255:0);
 	}
 	return re;
@@ -156,10 +150,13 @@ void VideoAbstraction::stitch(Mat &input1,Mat &input2,Mat &output,Mat &back,Mat 
 	int input1sim,input2sim;
 	double alpha;
 	uchar* indata1,*indata2,*outdata,*mdata,*bdata;
-	for(int i=0;i<input1.rows;i++){
-		for(int j=0;j<input1.cols;j++){
+	for(int i=0;i<input1.rows;i++)
+	{
+		for(int j=0;j<input1.cols;j++)
+		{
 			mdata=mask.data+i*stepm1+j*stepm2;
-			if((*mdata)!=0){
+			if((*mdata)!=0)
+			{
 				indata1=input1.data+i*step10+j*step11;
 				indata2=input2.data+i*step20+j*step21;
 				outdata=output.data+i*step30+j*step31;
@@ -416,11 +413,13 @@ int VideoAbstraction::computeMaskCollision(Mat &input1,Mat &input2){
 
 int VideoAbstraction::computeMaskCollision(vector<bool> &input1,vector<bool> &input2){
 	int ret=0;
-	if(input1.size()!=input2.size()){
+	if(input1.size()!=input2.size())
+	{
 		LOG(ERROR)<<"input vector size do not match\t"<<input1.size()<<"\t"<<input2.size()<<"\n";
 		return -1;
 	}
-	for(int i=0;i<input1.size();++i){
+	for(int i=0;i<input1.size();++i)
+	{
 		ret+=(input1[i]&&input2[i]);
 	}
 	return ret;
@@ -439,11 +438,13 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 	}
 	Mat amask,bmask;
 	if(path==""){
-		for(;as<=ob1.end&&bs<=ob2.end;as++,bs++){
+		for(;as<=ob1.end&&bs<=ob2.end;as++,bs++)
+		{
 			collision+=computeMaskCollision(ob1.objectMask[as-ob1.start],ob2.objectMask[bs-ob2.start]);
 		}
 	}else{
-		for(;as<=ob1.end&&bs<=ob2.end;as++,bs++){
+		for(;as<=ob1.end&&bs<=ob2.end;as++,bs++)
+		{
 			amask=imread(path+int2string(as)+".pgm",CV_LOAD_IMAGE_GRAYSCALE);
 			bmask=imread(path+int2string(bs)+".pgm",CV_LOAD_IMAGE_GRAYSCALE);
 			collision+=computeMaskCollision(amask,bmask);
@@ -454,23 +455,26 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 
 
 void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前背景分离函数
-	//cout<<"ori_size"<<currentFrame.rows<<"  "<<currentFrame.cols<<endl;
 	if(scaleSize != 1)
+	{
 		resize(currentFrame, currentFrame, Size(frameWidth,frameHeight));
-	//cout<<"Size"<<frameHeight<<"   "<<frameWidth<<endl;
-
-	if(frameIndex==50)								//如果中间文件原来已经存在，则执行清空操作
+	}
+	if(50==frameIndex)								//如果中间文件原来已经存在，则执行清空操作
+	{
 		ofstream file_flush(Configpath+MidName, ios::trunc);
-
-	if(frameIndex <= 50){							//初始化混合高斯 取前50帧图像来更新背景信息  提示：取值50仅供参考，并非必须是50
-		if(useGpu){
+	}
+	if(frameIndex <= 50)
+	{							//初始化混合高斯 取前50帧图像来更新背景信息  提示：取值50仅供参考，并非必须是50
+		if(useGpu)
+		{
 			//gpu module
 			gpuFrame.upload(currentFrame);
 			gpumog(gpuFrame,gpuForegroundMask,LEARNING_RATE);
 			gpumog.getBackgroundImage(gpuBackgroundImg);
 			gpuBackgroundImg.download(backgroundImage);
 		}
-		else{
+		else
+		{
 			currentFrame.copyTo(gFrame);				//复制要处理的图像帧到 gFrame 中
 			mog(gFrame,gForegroundMask,LEARNING_RATE);	//更新背景模型并且返回前景信息   参数解释： （下一个视频帧， 输出的前景帧信息， 学习速率）
 			mog.getBackgroundImage(gBackgroundImg);		//输出的背景信息存储在 gBackgroundImg
@@ -479,15 +483,19 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 		imwrite(InputName+"background.jpg",backgroundImage);
 	}
 
-	else{										//50帧之后的图像需要正常处理
-		if(frameIndex%2==0){						//更新前背景信息的频率，表示每5帧做一次前背景分离
-			if(useGpu){
+	else
+	{										//50帧之后的图像需要正常处理
+		if(frameIndex%2==0)
+		{						//更新前背景信息的频率，表示每5帧做一次前背景分离
+			if(useGpu)
+			{
 				//gpu module
 				gpuFrame.upload(currentFrame);
 				gpumog(gpuFrame,gpuForegroundMask,LEARNING_RATE);
 				gpuForegroundMask.download(currentMask);
 			}
-			else{
+			else
+			{
 				currentFrame.copyTo(gFrame);
 				mog(gFrame,gForegroundMask,LEARNING_RATE);
 				gForegroundMask.copyTo(currentMask);		//复制运动的凸包序列到 currentMask 中
@@ -495,46 +503,53 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
 			//freopen("exe.txt","a",stdout);
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
-			//cout<<sum<<endl;
-			//cout<<"lalala"<<thres/(scaleSize*scaleSize)<<" "<<thres<<" "<<scaleSize<<endl;
-			//整个画面
-			if(sum>(thres/(scaleSize*scaleSize))){							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
+			if(sum>(thres/(scaleSize*scaleSize)))
+			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				//cout<<"points number : "<<sum<<endl;
 				flag=true;
 			}
 		}
-		if(flag){							   //判断当前的图像帧是否包含有意义的运动序列信息
+		if(flag)
+		{							   //判断当前的图像帧是否包含有意义的运动序列信息
 			//imshow("check", currentMask);
 			//cout<<"area rate : "<<(double)sum/(frameHeight*frameWidth)<<endl;
 			//waitKey(0);
 			currentObject.objectMask.push_back(matToVector(currentMask));					//将当前帧添加到运动序列中
 			if(currentObject.start<0) currentObject.start=frameIndex;
-			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*10){	//当前运动序列太长，认为其实无意义的运动序列（比如一直摇动的树叶信息或者光线变化），则清空成功新开始
+			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*10)	//当前运动序列太长，认为其实无意义的运动序列（比如一直摇动的树叶信息或者光线变化），则清空成功新开始
+			{
 				currentObject.objectMask.clear();
 				currentObject.start=-1;
 				flag=false;
 				noObjectCount=0;
 			}
-			if(sum<thres){				   //当前图像中无运动序列
-				if(noObjectCount>=15){														//已经有连续15帧无运动序列，运动结束  存储运动序列
+			if(sum<thres)				   //当前图像中无运动序列
+			{
+				if(noObjectCount>=15)
+				{														//已经有连续15帧无运动序列，运动结束  存储运动序列
 					currentObject.end=frameIndex-15;
-					if(currentObject.end-currentObject.start>30){								//运动序列长度大于 50 才认为是有效运动，否则不认为其是运动的
+					if(currentObject.end-currentObject.start>30)
+					{								//运动序列长度大于 50 才认为是有效运动，否则不认为其是运动的
 						detectedMotion++;
 						currentLength=currentObject.end-currentObject.start+1;
-						if(currentLength>maxLengthToSpilt*10){								//运动序列的长度太长，是无意义的运动序列，直接丢弃
+						if(currentLength>maxLengthToSpilt*10)
+						{								//运动序列的长度太长，是无意义的运动序列，直接丢弃
 							detectedMotion--;
 						} 
-						else if(currentLength>maxLengthToSpilt*5){							//事件过长 进行切分处理
+						else if(currentLength>maxLengthToSpilt*5)
+						{							//事件过长 进行切分处理
 							LOG(INFO)<<"事件过长:"<<currentLength<<endl;
 							int spilt=currentLength/maxLengthToSpilt+1;
 							int spiltLength=currentLength/spilt;
 							ObjectCube temp;
-							for(int i=0;i<spilt;++i){										//保存切分后的运动序列的信息
+							for(int i=0;i<spilt;++i)
+							{										//保存切分后的运动序列的信息
 								vector<vector<bool>>().swap(temp.objectMask);
 								temp.start=currentObject.start+i*spiltLength;
 								temp.end=temp.start+spiltLength-1;
 								tempLength=spiltLength;
-								for(int j=0;j<spiltLength;++j){
+								for(int j=0;j<spiltLength;++j)
+								{
 									temp.objectMask.push_back(currentObject.objectMask[i*spiltLength+j]);
 								}
 								saveObjectCube(temp);
@@ -546,7 +561,8 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 							detectedMotion--;
 						}
 
-						else{														//事件正常长度，直接添加到运动序列中
+						else
+						{														//事件正常长度，直接添加到运动序列中
 							maxLength=max(currentLength,maxLength);
 							saveObjectCube(currentObject);
 							LOG(INFO)<<"事件"<<detectedMotion<<"\t开始帧"<<currentObject.start<<"\t结束帧"<<currentObject.end<<"\t长度"<<(currentObject.end-currentObject.start)*1.0/framePerSecond<<"秒"<<endl;
@@ -559,7 +575,8 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 				}
 				else noObjectCount++;
 			}
-			else{
+			else
+			{
 				noObjectCount=0;
 				flag=true;
 			}
@@ -572,7 +589,8 @@ void VideoAbstraction::saveObjectCube(ObjectCube &ob){			//保存运动的凸包
 	frame_start.push_back(ob.start);						//保存凸包的开始帧号
 	frame_end.push_back(ob.end);							//保存凸包的结束帧号
 	ofstream ff(Configpath+MidName, ofstream::app);
-	for(int i=ob.start,j=0;i<=ob.end;++i,++j){
+	for(int i=ob.start,j=0;i<=ob.end;++i,++j)
+	{
 		Mat tmp=vectorToMat(ob.objectMask[j],frameHeight,frameWidth);
 		vector<vector<Point>> contors;
 		findContours(tmp,contors,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE); //提取凸包信息
@@ -586,7 +604,8 @@ void VideoAbstraction::saveObjectCube(ObjectCube &ob){			//保存运动的凸包
 void VideoAbstraction::saveConfigInfo(){						//保存所有凸包运动序列的开始和结束帧信息
 	ofstream ff(Configpath+MidName, ofstream::app);
 	int size = frame_start.size();
-	for(int i=0; i<size; i++){
+	for(int i=0; i<size; i++)
+	{
 		ff<<endl;
 		ff<<frame_start[i]<<endl;
 		ff<<frame_end[i];
@@ -594,14 +613,15 @@ void VideoAbstraction::saveConfigInfo(){						//保存所有凸包运动序列�
 	ff.close();
 }
 
-void VideoAbstraction::loadObjectCube(int bias, vector<vector<Point>>& contors){ 
+string VideoAbstraction::loadObjectCube(int bias, vector<vector<Point>>& contours){ 
 	ifstream file(Configpath+MidName);
 	string temp;
-	contors.clear();
-	for(int i=0; i<bias; i++) {
+	for(int i=0; i<bias; i++) 
+	{
 		getline(file, temp, '#');
 	}
-	contors=stringToContors(temp);
+	contours = stringToContors(temp);
+	return temp;
 }
 
 void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指定事件序列号范围内的运动帧导入 partToCompound 和 partToCopy 中
@@ -609,20 +629,23 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 	partToCopyNum=0;
 	ifstream file(Configpath+MidName);
 	string temp;
-	for(int i=0; i<loadIndex; i++) {
+	for(int i=0; i<loadIndex; i++) 
+	{
 		getline(file, temp, '#');
 	}
 	int length=0;
 	ObjectCube ob;
 	vector<vector<Point>> contors;
 	bool scene_change=false;
-	for(int j=index_start; j<=index_end; j++){
+	for(int j=index_start; j<=index_end; j++)
+	{
 		cout<<frame_start[j]<<"\t"<<frame_end[j]<<endl;
 		ob.start=frame_start[j];
 		ob.end=frame_end[j];
 		length=frame_end[j]-frame_start[j]+1;
 		int changeSceneNum=0;
-		for(int i=0;i<length;++i){
+		for(int i=0;i<length;++i)
+		{
 			vector<vector<Point>>().swap(contors);
 			getline(file, temp, '#');
 			contors=stringToContors(temp);
@@ -636,22 +659,22 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 		loadIndex+=length;
 		vector<vector<Point>>().swap(contors);
 		curMaxLength=max(length,curMaxLength);
-
 		//view change
-		if(changeSceneNum > 20 || scene_change){
+		if(changeSceneNum > 20 || scene_change)
+		{
 			cout<<"put the event into the partToCopy ... "<<endl;
 			scene_change=true;
 			partToCopy.push_back(ob);
 			vector<vector<bool>>().swap(ob.objectMask);
 			partToCopyNum++;
 		}
-		else{
+		else
+		{
 			//cout<<"put the event into the partToCompound ... "<<endl;
 			partToCompound.push_back(ob);
 			vector<vector<bool>>().swap(ob.objectMask);
 			partToCompoundNum++;
 		}
-		//view change
 	}
 	file.close();
 }
@@ -660,12 +683,14 @@ void  VideoAbstraction::LoadConfigInfo(){		//不能分阶段处理 -- 读取中�
 	EventNum=0;
 	ifstream file(Configpath+MidName);
 	string temp;
-	for(int i=0; i<ObjectCubeNumber; i++) {		
+	for(int i=0; i<ObjectCubeNumber; i++) 
+	{		
 		getline(file, temp, '#');
 	}
 	frame_start.clear();
 	frame_end.clear();
-	while(!file.eof()){
+	while(!file.eof())
+	{
 		int start,end;
 		file>>start;
 		file>>end;
@@ -681,12 +706,14 @@ void  VideoAbstraction::LoadConfigInfo(int frameCountUsed){  //用于分阶段�
 	this->EventNum=0;
 	ifstream file(Configpath+MidName);
 	string temp;
-	for(int i=0; i<ObjectCubeNumber; i++) {	
+	for(int i=0; i<ObjectCubeNumber; i++) 
+	{	
 		getline(file, temp, '#');
 	}
 	frame_start.clear();
 	frame_end.clear();
-	while(!file.eof()){
+	while(!file.eof())
+	{
 		int start,end;
 		file>>start;
 		file>>end;
@@ -701,10 +728,12 @@ string VideoAbstraction::contorsToString(vector<vector<Point>> &contors){
 	string re="";
 	re+=boost::lexical_cast<string>(contors.size());
 	re+="\t";
-	for(int i=0;i<contors.size();++i){
+	for(int i=0;i<contors.size();++i)
+	{
 		re+=boost::lexical_cast<string>(contors[i].size());
 		re+="\t";
-		for(int j=0;j<contors[i].size();j++){
+		for(int j=0;j<contors[i].size();j++)
+		{
 			re+=boost::lexical_cast<string>(contors[i][j].x);
 			re+="\t";
 			re+=boost::lexical_cast<string>(contors[i][j].y);
@@ -722,13 +751,15 @@ vector<vector<Point>> VideoAbstraction::stringToContors(string ss){
 	string tmp=ss.substr(s,e-s);
 	s=e+1;
 	int n=boost::lexical_cast<int>(tmp),x,y;
-	for(int i=0;i<n;i++){
+	for(int i=0;i<n;i++)
+	{
 		vector<Point> cur;
 		e=ss.find("\t",s);
 		tmp=ss.substr(s,e-s);
 		s=e+1;
 		int nn=boost::lexical_cast<int>(tmp);
-		for(int j=0;j<nn;j++){
+		for(int j=0;j<nn;j++)
+		{
 			e=ss.find("\t",s);
 			tmp=ss.substr(s,e-s);
 			s=e+1;
@@ -756,7 +787,6 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 
 	collision=0;
 	int mcache=0;
-
 
 	clock_t starttime=clock();
 	for(int i=0;i<n;i++){
@@ -823,7 +853,7 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 * 视频合成阶段 参数： 包含有结果文件名字的完整路径 eg. compound("F:/input/Test.avi")
 */
 void VideoAbstraction::compound(string path){	
-	int testcount=0;
+	int testcount=-1;
 	Outpath=path;	
 	backgroundImage=imread(InputName+"background.jpg");
 	videoWriter.open(Outpath, (int)videoCapture.get(CV_CAP_PROP_FOURCC), 
@@ -831,7 +861,8 @@ void VideoAbstraction::compound(string path){
 		cv::Size(frameWidth, frameHeight),
 		true );		
 
-	if (!videoWriter.isOpened()){
+	if (!videoWriter.isOpened())
+	{
 		LOG(ERROR) <<"Can't create output video file: "<<Outpath<<endl;
 		return;
 	}
@@ -843,7 +874,8 @@ void VideoAbstraction::compound(string path){
 	cout<<"进入摘要视频合成..."<<endl;
 	clock_t starttime = clock();
 	int index=0;
-	for(int ss=0; ss<AverageCount || AverageCount==0; ss++){		//视频摘要合成的主循环	
+	for(int ss=0; ss<AverageCount || 0==AverageCount; ss++)  //视频摘要合成的主循环
+	{			
 		int synopsis=motionToCompound;
 		LOG(INFO)<<"*** 第"<<ss+1<<"次 ***"<<endl;
 		/*
@@ -854,19 +886,26 @@ void VideoAbstraction::compound(string path){
 		vector<ObjectCube>().swap(partToCopy);
 		maxLength=0;
 		curMaxLength=0;		
-		if(AverageCount==0){									//如果运动序列小于motionToCompound个，则只需要对所有的运动序列进行一次合成操作即可！
-			if(ObjectCount==0) { cout<<"没有运动序列"<<endl; return; }
-			else {
+		if(0==AverageCount)  //如果运动序列小于motionToCompound个，则只需要对所有的运动序列进行一次合成操作即可！
+		{									
+			if(0==ObjectCount) 
+			{ 
+				cout<<"没有运动序列"<<endl; return;
+			}
+			else 
+			{
 				loadObjectCube(ss, ss+RemainCount-1);            //从中间的凸包文件中读取运动序列到 partToCompound 中
 				synopsis=ObjectCount;
 				AverageCount=-1;
 			}
 		}
-		else if(ss==AverageCount-1){							//如果RemainCount不为0，则最后一次合成的时候，合成 motionToCompound+RemainCount 个运动序列
+		else if(ss==AverageCount-1)
+		{							//如果RemainCount不为0，则最后一次合成的时候，合成 motionToCompound+RemainCount 个运动序列
 			loadObjectCube(ss*motionToCompound, (ss+1)*motionToCompound+RemainCount-1);
 			synopsis=motionToCompound+RemainCount;
 		}
-		else{												//正常合成 motionToCompound 个运动序列
+		else
+		{												//正常合成 motionToCompound 个运动序列
 			loadObjectCube(ss*motionToCompound, (ss+1)*motionToCompound-1);	
 		}
 		/*
@@ -885,11 +924,13 @@ void VideoAbstraction::compound(string path){
 		Mat currentFrame;
 		Mat currentResultFrame;
 		Mat tempFrame;
-		for(int i=0;i<synopsis;i++){
+		for(int i=0;i<synopsis;i++)
+		{
 			cout<<"shift "<<i+1<<"\t"<<shift[i]<<endl;
 		}
 		int startCompound=INT_MAX;
-		for(int i=0;i<synopsis;i++){
+		for(int i=0;i<synopsis;i++)
+		{
 			startCompound=std::min(shift[i],startCompound);
 		}
 		cout<<"start\t"<<startCompound<<endl;
@@ -902,69 +943,77 @@ void VideoAbstraction::compound(string path){
 			Mat resultMask, tempMask;
 			Mat indexMat(Size(frameWidth,frameHeight), CV_8U);
 			int earliest=INT_MIN,earliestIndex=-1;
-			for(int i=0;i<synopsis;i++){	//寻找序列中开始时间最早的作为背景
-				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j){
-					if(partToCompound[i].end>earliest){
+			for(int i=0;i<synopsis;i++)
+			{	//寻找序列中开始时间最早的作为背景
+				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j)
+				{
+					if(partToCompound[i].end>earliest)
+					{
 						earliest=partToCompound[i].end;
 						earliestIndex=i;
 					}
 				}
 			}
 			int baseIndex, remainIndex; 
-			if(earliestIndex>-1){
+			if(earliestIndex>-1)
+			{
 				baseIndex=(earliestIndex+ss*motionToCompound)/256;
 				remainIndex=(earliestIndex+ss*motionToCompound)%256;
 				haveFrame=true;
 				videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[earliestIndex].start-1+j-shift[earliestIndex]);
-				//resize
-				//videoCapture>>currentFrame;
 				videoCapture>>currentFrame;
 				resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
-				//if(scaleSize > 1)		
-				//	pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
-				//else
-				//	tempFrame.copyTo(currentFrame);
-				//resize
 				currentResultFrame=currentFrame.clone();
 				resultMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);
-				//pyrUp(tempMask, resultMask, Size(frameWidth*scaleSize,frameHeight*scaleSize));
+				//
+				int currentIndex=j-shift[earliestIndex]+1;
+				currentIndex=getObjectIndex(earliestIndex+ss*motionToCompound, currentIndex);
+				saveContorsOfResultFrameToFile(testcount, (earliestIndex+ss*motionToCompound), currentIndex);
+				//
 				for(int ii=0; ii<indexMat.rows; ii++)
 				{
 					uchar* pi=indexMat.ptr<uchar>(ii);
 					uchar* ptr_re=resultMask.ptr<uchar>(ii);
-					for(int jj=0; jj<indexMat.cols;jj++){
+					for(int jj=0; jj<indexMat.cols;jj++)
+					{
 						pi[jj]=(earliestIndex+ss*motionToCompound)%256;
 						//pi[jj]=remainIndex;
-						if(ptr_re[jj]==255)
+						if(255==ptr_re[jj])
+						{
 							pi[jj]=255-pi[jj];
-							//pi[jj]=remainIndex;
+						}
 					}
 				}
 			}
 
-			if(!haveFrame){
+			if(!haveFrame)
+			{
 				cout<<"没有找到最早\n";
 				break;
 			}
 
-			for(int i=0;i<synopsis;i++){
-				if(i==earliestIndex){
+			for(int i=0;i<synopsis;i++)
+			{
+				if(i==earliestIndex)
+				{
 					continue;
 				}
-				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j){
+				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j)
+				{
 					videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[i].start-1+j-shift[i]); //设置背景图片
 					videoCapture>>currentFrame;
 					resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 					currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
 					//获取偏移后的正确的位移
-					int currentIndex=j-shift[i];
+					int currentIndex=j-shift[i]+1;
 					currentIndex=getObjectIndex(i+ss*motionToCompound, currentIndex);
-					//saveContorsOfResultFrameToFile(testcount, (i+ss*motionToCompound), currentIndex);
+					saveContorsOfResultFrameToFile(testcount, (i+ss*motionToCompound), currentIndex);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
 				}
 			}
-			if(earliestIndex>-1){
+			if(earliestIndex>-1)
+			{
 				int start = partToCompound[earliestIndex].start/framePerSecond;
 				int end = partToCompound[earliestIndex].end/framePerSecond;
 				vector<Point> info;
@@ -977,14 +1026,17 @@ void VideoAbstraction::compound(string path){
 		//deal with the scene change cases ...
 		cout<<"*************    partToCopy part    ***********"<<endl;
 		cout<<"Copy sequences number: "<<partToCopyNum<<endl;
-		if(partToCopyNum>0){
-			for(int i=0; i<partToCopyNum; i++){
+		if(partToCopyNum>0)
+		{
+			for(int i=0; i<partToCopyNum; i++)
+			{
 				int start = partToCopy[i].start/framePerSecond;
 				int end = partToCopy[i].end/framePerSecond;
 				int length = partToCopy[i].end-partToCopy[i].start+1;
 				int base_index = partToCopy[i].start;
 				sumLength += length;
-				for(int j=0; j<length; j++){
+				for(int j=0; j<length; j++)
+				{
 					videoCapture.set(CV_CAP_PROP_POS_FRAMES,j+base_index);
 					videoCapture>>currentResultFrame;
 					resize(currentResultFrame, currentResultFrame, Size(frameWidth, frameHeight));
@@ -998,7 +1050,6 @@ void VideoAbstraction::compound(string path){
 				}
 			}
 		}
-
 		currentFrame.release();
 		currentResultFrame.release();
 	}
@@ -1012,27 +1063,40 @@ void VideoAbstraction::setVideoFormat(string Format){	//保存视频的格式
 	videoFormat = Format;
 }
 
+/*
+* 设置是否使用GPU
+*/
 void VideoAbstraction::setGpu(bool isgpu){
 	useGpu=isgpu;
 }
 
+/*
+* 设置是否设置感兴趣区域勾选
+*/
 void VideoAbstraction::setROI(bool isroi){
 	useROI=isroi;
 }
 
+/*
+* 用保存图片格式进行索引的方法对于索引的图片上的值进行赋值操作
+*/
 void VideoAbstraction::writeMask(Mat& input, Mat& output, int index){
 	for(int ii=0; ii<input.rows; ii++)
 	{
 		const uchar* ptr_input=input.ptr<uchar>(ii);
 		uchar* ptr_output=output.ptr<uchar>(ii);
 		for(int jj=0; jj<input.cols;jj++){
-			if(ptr_input[jj]==255)
+			if(255==ptr_input[jj])
+			{
 				ptr_output[jj]=255-index;
-				//ptr_output[jj]=index;
+			}
 		}
 	}
 }
 
+/*
+* 获取所有的关键帧及每个关键事件中的一帧信息保存成图片到路径 /KeyFrames/inputname/*
+*/
 void VideoAbstraction::getKeyFrame(string keyframe_path){
 	create_path(keyframe_path);
 	VideoCapture videoread;
@@ -1042,7 +1106,8 @@ void VideoAbstraction::getKeyFrame(string keyframe_path){
 	int s1,s2,s3,e1,e2,e3,frame_index;
 	vector<vector<Point>> keycontors;
 	loadIndex=0;
-	for(int i=0; i<EventNum; i++){
+	for(int i=0; i<EventNum; i++)
+	{
 		//read the key frames
 		//frame_index=(frame_start[i]+frame_end[i])/2;
 		frame_index=frame_start[i];
@@ -1067,6 +1132,9 @@ void VideoAbstraction::getKeyFrame(string keyframe_path){
 	}
 }
 
+/*
+* 在求解出来的关键帧上标记出来运动的物体
+*/
 void VideoAbstraction::MarkContours(Mat& mat, vector<vector<Point>>& contours){
 	for (int i=0;i<contours.size();i++)
 	{
@@ -1074,7 +1142,6 @@ void VideoAbstraction::MarkContours(Mat& mat, vector<vector<Point>>& contours){
 		int y_min=9999999;
 		int x_max=0;
 		int y_max=0;
-
 		for (int j=1;j<contours[i].size();j++)
 		{
 			if (x_min>contours[i][j].x)
@@ -1098,40 +1165,52 @@ void VideoAbstraction::MarkContours(Mat& mat, vector<vector<Point>>& contours){
 	}
 }
 
+/*
+* 创建传进来的路径/如果存在则不会创建
+*/
 void VideoAbstraction::create_path(string path){
 	fstream testfile;
 	testfile.open(path, ios::in);
-	if(!testfile){
+	if(!testfile)
+	{
 		boost::filesystem::path dir(path);
 		boost::filesystem::create_directories(dir);
 	}
 }
 
+/*
+* 参数：指定的事件序号 事件中的偏移量   返回值： 中间config文件中的偏移量（所有运动序列中的偏移量）
+*/
 int VideoAbstraction::getObjectIndex(int number, int bias){
 	int result=0;
 	for(int i=0; i<number; i++){
-		result+=frame_end[i]-frame_start[i]+1;
+		result+=frame_end[i]-frame_start[i];
 	}
 	result+=bias;
 	return result;
 }
 
-//将时间文本写到指定mat上
+/*
+* 将时间标记写到传入的mat上的所有凸包的中间点部分
+*/
 void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<Point>>& contours){
 	vector<Point> info;
 	vector<vector<Point>>::const_iterator itc_re=contours.begin();
 	while(itc_re!=contours.end()){
-		if(contourArea(*itc_re) < objectarea){
+		if(contourArea(*itc_re) < objectarea)
+		{
 			itc_re=contours.erase(itc_re);
 		}
-		else{
+		else
+		{
 			convexHull(*itc_re,info);
 			Point p1 = info.at(1);
 			Point p2 = info.at(info.size()/2);
 			Point mid;
 			mid.x = (p1.x+p2.x)/2;
 			mid.y = (p1.y+p2.y)/2;
-			if(useROI){
+			if(useROI)
+			{
 				mid.x += rectROI.x;
 				mid.y += rectROI.y;
 			}
@@ -1148,6 +1227,9 @@ void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<
 	}
 }
 
+/*
+* 计算传入需要合成的若干运动序列的偏移量数组
+*/
 void VideoAbstraction::computeShift(vector<int>& shift, vector<ObjectCube>& pCompound){
 	LOG(INFO)<<"开始计算shift"<<endl;
 	int min=INT_MAX,cur_collision=0;						
@@ -1155,19 +1237,24 @@ void VideoAbstraction::computeShift(vector<int>& shift, vector<ObjectCube>& pCom
 	vector<int> tmpshift;
 	int *tempptr=(int *)cacheCollision;
 	int cache_size=sizeof(cacheCollision)/4;
-	for(int i=0;i<cache_size;i++){
+	for(int i=0;i<cache_size;i++)
+	{
 		tempptr[i]=-1;
 	}		
-	for(int randtime=0;randtime<1;++randtime){
+	for(int randtime=0;randtime<1;++randtime)
+	{
 		LOG(INFO)<<"生成第"<<randtime+1<<"次初始点\n";
-		for(int i=0;i<shift.size();i++){					  //初始化偏移序列
+		for(int i=0;i<shift.size();i++) //初始化偏移序列
+		{					  
 			shift[i]=0;
 		}
-		while(1){									   //计算满足冲突比较少的所有的偏移序列
+		while(1)                     //计算满足冲突比较少的所有的偏移序列
+		{									  
 			cur_collision=graphCut(shift,pCompound);
 			LOG(INFO)<<"当前碰撞:"<<cur_collision<<endl;
 			if(cur_collision<0) break;
-			if(cur_collision<min){
+			if(cur_collision<min)
+			{
 				min=cur_collision;
 				tmpshift=shift;
 			}
@@ -1178,39 +1265,41 @@ void VideoAbstraction::computeShift(vector<int>& shift, vector<ObjectCube>& pCom
 	LOG(INFO)<<"时间偏移计算耗时"<<clock()-starttime<<"豪秒\n";
 }
 
-
+/*
+* 事件索引回放功能实现
+*/
 std::string VideoAbstraction::getTempFilePath(int frame_num){
 	std::string fileName;
 	create_path(Inputpath+"Replay/"+InputName+"/");
 	string filepath=Inputpath+"Replay/"+InputName+"/";
-	//std::sprintf(fileName, "%s%d.txt", filepath, frame_Num);
 	char num[10];
 	fileName = filepath + itoa(frame_num, num, 10) + ".txt";
 	return fileName;
 }
 
 bool VideoAbstraction::saveContorsOfResultFrameToFile(int frame_Num, int indexOfMask, int bias){
+	//cout<<"frameNum "<<frame_Num<<"   index of mask" << indexOfMask << endl;
 	std::string fileName = getTempFilePath(frame_Num);
-	std::ofstream outfile(fileName, ios::ate);
-	std::vector<std::vector<cv::Point> >contours;
+	std::ofstream outfile(fileName, ios::app);
+	vector<vector<Point>> contours;
 	//change the way to Get contours ...
-	loadObjectCube(bias, contours);
-	outfile << indexOfMask << " " << contorsToString(contours) << std::endl;
+	outfile << indexOfMask << " " << loadObjectCube(bias, contours) << std::endl;
 	outfile.close();
 	return true;
 }
 
-
 cv::Mat VideoAbstraction::loadContorsOfResultFrameFromFile(int frame_Num, int width, int height, vector<int>& lookupTable){
 	lookupTable.clear();
-	lookupTable.push_back(-1);//
+	lookupTable.push_back(-1);
 
 	cv::Mat resultMask(width, height, CV_8UC1, Scalar::all(0));
 	std::string fileName = getTempFilePath(frame_Num);
 	std::ifstream infile(fileName);
 
 	std::string line;
-	while (std::getline(infile, line))
+	cv::Mat mask(width, height, CV_8UC1, Scalar::all(0));
+
+	while (std::getline(infile, line)) 
 	{
 		if (!line.size())
 			continue;
@@ -1218,38 +1307,45 @@ cv::Mat VideoAbstraction::loadContorsOfResultFrameFromFile(int frame_Num, int wi
 		std::string sContors;
 		int indexOfMask = -1;
 		ss >> indexOfMask;//每行第一个数值为事件标号，后面为Contors定点坐标
-		if (indexOfMask != lookupTable.back())
+		//cout << indexOfMask << " " << lookupTable. << " size "<<lookupTable.size();
+		if (indexOfMask != lookupTable[lookupTable.size() - 1]){
 			lookupTable.push_back(indexOfMask);
+		}
 		std::getline(ss, sContors);
 		sContors = sContors.substr(1);
-		std::vector<std::vector<cv::Point> >contours = stringToContors(sContors);
-		cv::Mat mask(width, height, CV_8UC1, Scalar::all(0));
+		std::vector<std::vector<cv::Point> >contours = stringToContors(sContors);	
 		cv::drawContours(mask, contours, -1, Scalar(255), -1);
-		restoreMaskOfFram(resultMask, mask, lookupTable.size());
+		restoreMaskOfFrame(resultMask, mask, lookupTable.size() - 1);
+		mask = cv::Mat::zeros(width, height, CV_8UC1);
 	}
 	infile.close();
+	
 	return resultMask;
 }
 
-bool VideoAbstraction::restoreMaskOfFram(cv::Mat& FrameMask, cv::Mat& oneContors, int index){
+bool VideoAbstraction::restoreMaskOfFrame(cv::Mat& FrameMask, cv::Mat& eventMask, int index){
+	/*imshow("eventMask", eventMask);
+	waitKey(0);*/
 	int nc = FrameMask.cols;
 	int nl = FrameMask.rows;
-	if (oneContors.cols != nc || oneContors.rows != nl)
+	if (eventMask.cols != nc || eventMask.rows != nl){
 		return false;
-	if (FrameMask.isContinuous() && oneContors.isContinuous())
+	}
+	if (FrameMask.isContinuous() && eventMask.isContinuous())
 	{
 		nc = nc * nl;
 		nl = 1;
 	}
 	for (int j = 0; j < nl; ++j)
 	{
-		uchar* c_data = oneContors.ptr<uchar>(j);
+		uchar* c_data = eventMask.ptr<uchar>(j);
 		uchar* m_data = FrameMask.ptr<uchar>(j);
 		for (int i = 0; i < nc; ++i)
 		{
 			if (*c_data++ != 0)
 			{
-				*m_data++ = index * 100;
+				//*m_data++ = index;
+				*m_data++ = index;
 			} else {
 				m_data++;
 			}

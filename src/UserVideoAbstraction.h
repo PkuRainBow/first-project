@@ -22,6 +22,7 @@ public:
 	__declspec(dllexport) void UsersetGpu(bool isgpu);													// 设置是否使用GPU
 	__declspec(dllexport) void UsersetROI(Rect rectroi);											// 设置是否选择感兴趣的区域
 	__declspec(dllexport) void UsersetIndex(bool isindex);
+	__declspec(dllexport) void UsersetSingleMinArea(int area);
 	__declspec(dllexport) void UsersetMinArea(int area);
 	__declspec(dllexport) void UserGetKeyFrame(string filepath, int frameCount);
 };

@@ -83,8 +83,6 @@ public:
 	int EventNum;
 	vector<int> frame_start;			//记录所有运动序列的开始帧序号/结束帧序号
 	vector<int> frame_end;
-	//vector<bool> view_change;
-	//vector<string> allObjectCube;		//存储所有运动序列的凸包信息 
 	int loadIndex;					//load凸包运动信息的偏移参数
 
 	string videoFormat;
@@ -144,7 +142,7 @@ public:
 	void saveObjectCube(ObjectCube &ob);													//存放运动序列到本地
 	int saveRemainObject();															//保存多出来的运动序列信息并返回包含有运动序列的图像帧的个数 赋值给 ObjectCubeNumber
 	void loadObjectCube(int index_start, int index_len);									//读取本地存放的运动序列
-	void loadObjectCube(int bias, vector<vector<Point>>& contors);
+	string loadObjectCube(int bias, vector<vector<Point>>& contors);
 	void saveConfigInfo();																//存放配置信息
 	void LoadConfigInfo();																//读取本地存放的配置信息
 	void LoadConfigInfo(int frameCountUsed);												//读取本地存放的配置信息
@@ -176,8 +174,9 @@ public:
 	//ISSUE: 文件中读出的事件序号很可能大于255，如何处理？
 	//lookupTable: 生成的mask中每个像素有一个0-8的数值，使用数值下标在lookupTable中取出实际的事件序号（1-8有效）
 	cv::Mat loadContorsOfResultFrameFromFile(int frame_Num, int width, int height, vector<int>& lookupTable);
-	bool restoreMaskOfFram(cv::Mat& FrameMask, cv::Mat& oneContors, int index);
+	bool restoreMaskOfFrame(cv::Mat& FrameMask, cv::Mat& eventMask, int index);
 	std::string getTempFilePath(int frame_num);
+
 	int getObjectIndex(int number, int bias);
 	void writePartToCompound(vector<ObjectCube>& pCompound);
 	void writePartToCopy(vector<ObjectCube>& pCopy);
