@@ -12,7 +12,7 @@
 
 #define DIV_NUMBER 9
 #define MAX_INDEX_COUNT 300
-#define MIN_AREA 200
+#define MIN_AREA 200  //test use 200
 
 //declaration
 extern int readFrameLog(string logname);
@@ -199,7 +199,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	{
 		scale=((float)video_width)/360;
 	}
-	
+	scale=1;
 
 	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
@@ -360,34 +360,55 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 
 
 int main(){
-	cout<<"***********************************************************************************"<<endl;
-	cout<<"\t"<<"Using Guidance "<<endl;
-	cout<<"\t"<<"Please input 1 / 2 / 3 / 4"<<endl;
-	cout<<"\t"<<"1:   subtract the background and foreground of the input video"<<endl;
-	cout<<"\t"<<"2:   compound the convex point sequence to produce the abstracted video"<<endl;
-	cout<<"\t"<<"3:   you can replay the seleted object's event full process"<<endl;
-	cout<<"\t"<<"4:   you can view 9 snip-shots of the original video"<<endl;
-	cout<<"\t"<<"others:   Exit !"<<endl;
-	cout<<"*********************************************************************************"<<endl;
-	string result_name="result_test.avi";
-	string config_name="config_test";
-	//boost::thread test1(testmultithread,"test/", "test.avi", config_name, result_name, 1025, 8, 2, 3);
+	//cout<<"***********************************************************************************"<<endl;
+	//cout<<"\t"<<"Using Guidance "<<endl;
+	//cout<<"\t"<<"Please input 1 / 2 / 3 / 4"<<endl;
+	//cout<<"\t"<<"1:   subtract the background and foreground of the input video"<<endl;
+	//cout<<"\t"<<"2:   compound the convex point sequence to produce the abstracted video"<<endl;
+	//cout<<"\t"<<"3:   you can replay the seleted object's event full process"<<endl;
+	//cout<<"\t"<<"4:   you can view 9 snip-shots of the original video"<<endl;
+	//cout<<"\t"<<"others:   Exit !"<<endl;
+	//cout<<"*********************************************************************************"<<endl;
+	//string result_name="result_test.avi";
+	//string config_name="config_test";
+	////boost::thread test1(testmultithread,"test/", "test.avi", config_name, result_name, 1025, 8, 2, 3);
 
-	int choice;
-	bool flag=true;
-	while(flag){
-		cout<<"Please input the choice No. : ";
-		cin>>choice;
-		if(choice== 1 || choice == 2 || choice == 3 || choice == 4){
-			//boost::thread test1(testmultithread,"F:/TongHaoTest2/", "testvideo.avi", config_name, result_name, 0, 8, choice, true);
-			boost::thread test1(testmultithread,"F:/TongHaoTest2/", "大门口.avi", config_name, result_name, 0, 8, choice, true);
-			//boost::thread test1(testmultithread,"F:/TongHaoTest2/", "食堂1.avi", config_name, result_name, 0, 8, choice, true);
-			test1.join();
-			cout<<"finish step "<<choice<<endl;
-		}
-		else
-			return 0;
+	//int choice;
+	//bool flag=true;
+	//while(flag){
+	//	cout<<"Please input the choice No. : ";
+	//	cin>>choice;
+	//	if(choice== 1 || choice == 2 || choice == 3 || choice == 4){
+	//		//boost::thread test1(testmultithread,"F:/TongHaoTest2/", "testvideo.avi", config_name, result_name, 0, 8, choice, true);
+	//		boost::thread test1(testmultithread,"F:/TongHaoTest2/", "大门口.avi", config_name, result_name, 0, 8, choice, true);
+	//		//boost::thread test1(testmultithread,"F:/TongHaoTest2/", "食堂1.avi", config_name, result_name, 0, 8, choice, true);
+	//		test1.join();
+	//		cout<<"finish step "<<choice<<endl;
+	//	}
+	//	else
+	//		return 0;
+	//}
+	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
+		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
+		"Cam3.avi", "Cam4.avi"};
+	string testset2[] = {"20110915_14-17-35.avi","20111202_082711.avi","20111202_101331.avi","大门口.avi","高档小区.avi","金融.avi","卡口 .avi",
+		"三楼办公室.avi", "食堂1.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi"};
+
+	for(int i=0; i<testset2->size(); i++){	
+		string result_name="result_"+testset2[i];
+		string config_name="config_"+boost::lexical_cast<string>(i);
+		boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
+		test1.join();
+		cout<<"finished..."<<endl;
 	}
+
+	//for(int i=0; i<testset1->size(); i++){	
+	//	string result_name="result_"+testset1[i];
+	//	string config_name="config_"+boost::lexical_cast<string>(i);
+	//	boost::thread test1(testmultithread,"F:/TongHaoTest1/", testset1[i], config_name, result_name, 0, 8, 1, true);
+	//	test1.join();
+	//	cout<<"finished..."<<endl;
+	//}
 	return 0;
 }
 

@@ -594,11 +594,11 @@ void VideoAbstraction::saveConfigInfo(){						//保存所有凸包运动序列�
 	ff.close();
 }
 
-void VideoAbstraction::loadObjectCube(vector<vector<Point>>& contors){ 
+void VideoAbstraction::loadObjectCube(int bias, vector<vector<Point>>& contors){ 
 	ifstream file(Configpath+MidName);
 	string temp;
 	contors.clear();
-	for(int i=0; i<loadIndex; i++) {
+	for(int i=0; i<bias; i++) {
 		getline(file, temp, '#');
 	}
 	contors=stringToContors(temp);
@@ -867,9 +867,13 @@ void VideoAbstraction::compound(string path){
 	cout<<"进入摘要视频合成..."<<endl;
 	clock_t starttime = clock();
 	int index=0;
-	for(int ss=0; ss<AverageCount || AverageCount==0; ss++){		//视频摘要合成的主循环
+	for(int ss=0; ss<AverageCount || AverageCount==0; ss++){		//视频摘要合成的主循环	
 		int synopsis=motionToCompound;
-		cout<<"*** 第"<<ss+1<<"次 ***"<<endl;
+		LOG(INFO)<<"*** 第"<<ss+1<<"次 ***"<<endl;
+		/*
+		* 导入需要进行合并的凸包序列到内存中
+		*/
+		LOG(INFO)<<"load the object cube to compound to the memory ..."<<endl;
 		vector<ObjectCube>().swap(partToCompound);
 		vector<ObjectCube>().swap(partToCopy);
 		maxLength=0;
@@ -889,43 +893,18 @@ void VideoAbstraction::compound(string path){
 		else{												//正常合成 motionToCompound 个运动序列
 			loadObjectCube(ss*motionToCompound, (ss+1)*motionToCompound-1);	
 		}
-		//
-		cout<<"*************    partToCompound part    ***********"<<endl;
-		cout<<"Compound sequences number: "<<partToCompoundNum<<endl;
+		/*
+		* 计算需要合成的序列的偏移量
+		*/
+		LOG(INFO)<<"compute the shift array for the object sequences ..."<<endl;
+		LOG(INFO)<<"Compound sequences number: "<<partToCompoundNum<<endl;
 		synopsis=partToCompoundNum;
-		vector<int> shift(synopsis,0);							//运动序列的偏移数组
-		int min=INT_MAX,cur_collision=0;						
-		//Mat zeroObject(frameHeight,frameWidth,CV_8U,Scalar::all(0)),zeroObject1(frameHeight,frameWidth,CV_16U,Scalar::all(0)),oneObject(frameHeight,frameWidth,CV_16U,Scalar::all(1));
-		LOG(INFO)<<"开始计算shift"<<endl;
-		clock_t starttime=clock();
-		vector<int> tmpshift;
-		int *tempptr=(int *)cacheCollision;
-		int cache_size=sizeof(cacheCollision)/4;
-		for(int i=0;i<cache_size;i++){
-			tempptr[i]=-1;
-		}		
-		for(int randtime=0;randtime<1;++randtime){
-			LOG(INFO)<<"生成第"<<randtime+1<<"次初始点\n";
-			for(int i=0;i<synopsis;i++){					  //初始化偏移序列
-				shift[i]=0;
-			}
-			while(1){									   //计算满足冲突比较少的所有的偏移序列
-				cur_collision=graphCut(shift,partToCompound);
-				LOG(INFO)<<"当前碰撞:"<<cur_collision<<endl;
-				if(cur_collision<0) break;
-				if(cur_collision<min){
-					min=cur_collision;
-					tmpshift=shift;
-				}
-			}
-		}
-		shift=tmpshift;
-		// check whether there are obvious changes in the PartToCompound Sequence ... 
-
-		LOG(INFO)<<"最小损失"<<min<<endl;
-		LOG(INFO)<<"时间偏移计算耗时"<<clock()-starttime<<"豪秒\n";
-		LOG(INFO)<<"开始合成"<<endl;
-
+		vector<int> shift(synopsis,0);
+		computeShift(shift, partToCompound);	
+		/*
+		* 根据求解出来的偏移量进行合成操作
+		*/
+		LOG(INFO)<<"start to compound the shifted sequences ..."<<endl;	
 		starttime=clock();
 		Mat currentFrame;
 		Mat currentResultFrame;
@@ -939,15 +918,12 @@ void VideoAbstraction::compound(string path){
 		}
 		cout<<"start\t"<<startCompound<<endl;
 		cout<<"end\t"<<curMaxLength<<endl;
-		//cout<<"writing to the video ..."<<endl;
 		sumLength+=(curMaxLength-startCompound);	
 		for(int j=startCompound;j<curMaxLength;j++)
 		{
 			testcount++;
 			bool haveFrame=false;
 			Mat resultMask, tempMask;
-			//初始化 indexMat
-			//Mat indexMat(Size(frameWidth*scaleSize,frameHeight*scaleSize), CV_8U);
 			Mat indexMat(Size(frameWidth,frameHeight), CV_8U);
 			int earliest=INT_MIN,earliestIndex=-1;
 			for(int i=0;i<synopsis;i++){	//寻找序列中开始时间最早的作为背景
@@ -1001,19 +977,13 @@ void VideoAbstraction::compound(string path){
 				}
 				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j){
 					videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[i].start-1+j-shift[i]); //设置背景图片
-					//resize
-					//videoCapture>>currentFrame;
 					videoCapture>>currentFrame;
 					resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
-					//if(scaleSize > 1)		
-					//	pyrDown(tempFrame, currentFrame, Size(frameWidth,frameHeight));
-					//else
-					//	tempFrame.copyTo(currentFrame);
-					//resize
 					currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
-					saveContorsOfResultFrameToFile(testcount, currentMask, (i+ss*motionToCompound));
-					//pyrUp(tempMask, currentMask, Size(frameWidth*scaleSize,frameHeight*scaleSize));
-					//writeMask(currentMask, indexMat, (i+ss*motionToCompound)%256);
+					//获取偏移后的正确的位移
+					int currentIndex=j-shift[i];
+					currentIndex=getObjectIndex(i+ss*motionToCompound, currentIndex);
+					saveContorsOfResultFrameToFile(testcount, (i+ss*motionToCompound), currentIndex);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
 				}
@@ -1024,45 +994,8 @@ void VideoAbstraction::compound(string path){
 				vector<Point> info;
 				vector<vector<Point>> re_contours;		
 				findContours(resultMask,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
-				vector<vector<Point>>::const_iterator itc_re=re_contours.begin();
-				while(itc_re!=re_contours.end()){
-					if(contourArea(*itc_re) < objectarea){
-						itc_re=re_contours.erase(itc_re);
-					}
-					else{
-						convexHull(*itc_re,info);
-						Point p1 = info.at(1);
-						Point p2 = info.at(info.size()/2);
-						Point mid;
-						mid.x = (p1.x+p2.x)/2;
-						mid.y = (p1.y+p2.y)/2;
-						if(useROI){
-							mid.x += rectROI.x;
-							mid.y += rectROI.y;
-							//cout<<rectROI.x<<"***"<<rectROI.y<<endl;
-						}
-						int s1,s2,s3,e1,e2,e3;
-						s1=start/3600;
-						s2=(start%3600)/60;
-						s3=start%60;
-						e1=end/3600;
-						e2=(end%3600)/60;
-						e3=end%60;
-						//putText(output,int2string(start)+"-"+int2string(end),mid,CV_FONT_HERSHEY_COMPLEX,0.2, Scalar(0,0,255),1);
-						putText(currentResultFrame,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
-						itc_re++;
-					}
-				}
-			}		
-			//string filepath=Indexpath+InputName+"/";
-			//fstream testfile;
-			//testfile.open(filepath, ios::in);
-			//if(!testfile){
-			//	boost::filesystem::path dir(filepath);
-			//	boost::filesystem::create_directories(dir);
-			//}
-			//string filename=boost::lexical_cast<string>(testcount)+".jpeg";
-			//imwrite(filepath+filename, indexMat);
+				putTextToMat(start, end, currentResultFrame, re_contours);
+			}
 			videoWriter.write(currentResultFrame);
 		}
 		//deal with the scene change cases ...
@@ -1084,43 +1017,8 @@ void VideoAbstraction::compound(string path){
 					vector<vector<Point>> re_contours;	
 					Mat mat1=vectorToMat(partToCopy[i].objectMask[j],frameHeight,frameWidth);
 					findContours(mat1,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
-					vector<vector<Point>>::const_iterator itc_re=re_contours.begin();
-					while(itc_re!=re_contours.end()){
-						if(contourArea(*itc_re) < objectarea){
-							itc_re=re_contours.erase(itc_re);
-						}
-						else{
-							convexHull(*itc_re,info);
-							Point p1 = info.at(1);
-							Point p2 = info.at(info.size()/2);
-							Point mid;
-							mid.x = (p1.x+p2.x)/2;
-							mid.y = (p1.y+p2.y)/2;
-							if(useROI){
-								mid.x += rectROI.x;
-								mid.y += rectROI.y;
-							}
-							int s1,s2,s3,e1,e2,e3;
-							s1=start/3600;
-							s2=(start%3600)/60;
-							s3=start%60;
-							e1=end/3600;
-							e2=(end%3600)/60;
-							e3=end%60;
-							putText(currentResultFrame,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
-							itc_re++;
-						}
-					}
+					putTextToMat(start, end, currentResultFrame, re_contours);
 					videoWriter.write(currentResultFrame);
-					//create and store the index mat ...
-					//Mat indexMat(Size(frameWidth*scaleSize,frameHeight*scaleSize), CV_8U);
-					//for(int ii=0; ii<indexMat.rows; ii++)
-					//{
-					//	uchar* pi=indexMat.ptr<uchar>(ii);
-					//	for(int jj=0; jj<indexMat.cols;jj++){
-					//		pi[jj]=(partToCompoundNum+ss*motionToCompound+i)%256;
-					//	}
-					//}
 				}
 			}
 		}
@@ -1175,7 +1073,7 @@ void VideoAbstraction::getKeyFrame(string keyframe_path){
 		loadIndex+=frame_index-frame_start[i]+1;
 		videoread.set(CV_CAP_PROP_POS_FRAMES, frame_index);
 		videoread>>keyframes;
-		loadObjectCube(keycontors);
+		loadObjectCube(loadIndex, keycontors);
 		MarkContours(keyframes, keycontors);
 		//put the time tag on the frame
 		s1=frame_start[i]/3600;
@@ -1243,13 +1141,12 @@ std::string VideoAbstraction::getTempFilePath(int frame_num){
 	return fileName;
 }
 
-bool VideoAbstraction::saveContorsOfResultFrameToFile(int frame_Num, cv::Mat& mask, int indexOfMask){
+bool VideoAbstraction::saveContorsOfResultFrameToFile(int frame_Num, int indexOfMask, int bias){
 	std::string fileName = getTempFilePath(frame_Num);
 	std::ofstream outfile(fileName, ios::ate);
-    //freopen("exe.txt","a",stdout);
-	//cout<<"replay"<<fileName<<"  "<<frame_Num<<"   "<<indexOfMask<<endl;
 	std::vector<std::vector<cv::Point> >contours;
-	cv::findContours(mask, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+	//change the way to Get contours ...
+	loadObjectCube(bias, contours);
 	outfile << indexOfMask << " " << contorsToString(contours) << std::endl;
 	outfile.close();
 	return true;
@@ -1307,9 +1204,84 @@ bool VideoAbstraction::restoreMaskOfFram(cv::Mat& FrameMask, cv::Mat& oneContors
 				*m_data++ = index * 100;
 			} else {
 				m_data++;
-
 			}
 		}
 	}
 	return true;
+}
+
+
+int VideoAbstraction::getObjectIndex(int number, int bias){
+	int result=0;
+	for(int i=0; i<number; i++){
+		result+=frame_end[i]-frame_start[i]+1;
+	}
+	result+=bias;
+	return result;
+}
+
+void VideoAbstraction::writePartToCompound(vector<ObjectCube>& pCompound){}
+
+void VideoAbstraction::writePartToCopy(vector<ObjectCube>& pCopy){}
+
+//将时间文本写到指定mat上
+void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<Point>>& contours){
+	vector<Point> info;
+	vector<vector<Point>>::const_iterator itc_re=contours.begin();
+	while(itc_re!=contours.end()){
+		if(contourArea(*itc_re) < objectarea){
+			itc_re=contours.erase(itc_re);
+		}
+		else{
+			convexHull(*itc_re,info);
+			Point p1 = info.at(1);
+			Point p2 = info.at(info.size()/2);
+			Point mid;
+			mid.x = (p1.x+p2.x)/2;
+			mid.y = (p1.y+p2.y)/2;
+			if(useROI){
+				mid.x += rectROI.x;
+				mid.y += rectROI.y;
+			}
+			int s1,s2,s3,e1,e2,e3;
+			s1=start/3600;
+			s2=(start%3600)/60;
+			s3=start%60;
+			e1=end/3600;
+			e2=(end%3600)/60;
+			e3=end%60;
+			putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
+			itc_re++;
+		}
+	}
+}
+
+void VideoAbstraction::computeShift(vector<int>& shift, vector<ObjectCube>& pCompound){
+	LOG(INFO)<<"开始计算shift"<<endl;
+	int min=INT_MAX,cur_collision=0;						
+	clock_t starttime=clock();
+	vector<int> tmpshift;
+	int *tempptr=(int *)cacheCollision;
+	int cache_size=sizeof(cacheCollision)/4;
+	for(int i=0;i<cache_size;i++){
+		tempptr[i]=-1;
+	}		
+	for(int randtime=0;randtime<1;++randtime){
+		LOG(INFO)<<"生成第"<<randtime+1<<"次初始点\n";
+		for(int i=0;i<shift.size();i++){					  //初始化偏移序列
+			shift[i]=0;
+		}
+		while(1){									   //计算满足冲突比较少的所有的偏移序列
+			cur_collision=graphCut(shift,pCompound);
+			LOG(INFO)<<"当前碰撞:"<<cur_collision<<endl;
+			if(cur_collision<0) break;
+			if(cur_collision<min){
+				min=cur_collision;
+				tmpshift=shift;
+			}
+		}
+	}
+	shift=tmpshift;
+	LOG(INFO)<<"最小损失"<<min<<endl;
+	LOG(INFO)<<"时间偏移计算耗时"<<clock()-starttime<<"豪秒\n";
 }

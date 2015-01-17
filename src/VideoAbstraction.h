@@ -144,7 +144,7 @@ public:
 	void saveObjectCube(ObjectCube &ob);													//存放运动序列到本地
 	int saveRemainObject();															//保存多出来的运动序列信息并返回包含有运动序列的图像帧的个数 赋值给 ObjectCubeNumber
 	void loadObjectCube(int index_start, int index_len);									//读取本地存放的运动序列
-	void loadObjectCube(vector<vector<Point>>& contors);
+	void loadObjectCube(int bias, vector<vector<Point>>& contors);
 	void saveConfigInfo();																//存放配置信息
 	void LoadConfigInfo();																//读取本地存放的配置信息
 	void LoadConfigInfo(int frameCountUsed);												//读取本地存放的配置信息
@@ -170,7 +170,7 @@ public:
 	//frame_Num  结果视频序号
 	//mask  每帧结果视频由多个事件合成，mask来自其中一个事件。
 	//indexOfMask   事件序号
-	bool saveContorsOfResultFrameToFile(int frame_Num, cv::Mat& mask, int indexOfMask);
+	bool saveContorsOfResultFrameToFile(int frame_Num, int indexOfMask, int bias);
 
 	//从文件中读取contors信息，合成结果视频中frame_Num帧对应的事件Mask信息
 	//ISSUE: 文件中读出的事件序号很可能大于255，如何处理？
@@ -178,4 +178,9 @@ public:
 	cv::Mat loadContorsOfResultFrameFromFile(int frame_Num, int width, int height, vector<int>& lookupTable);
 	bool restoreMaskOfFram(cv::Mat& FrameMask, cv::Mat& oneContors, int index);
 	std::string getTempFilePath(int frame_num);
+	int getObjectIndex(int number, int bias);
+	void writePartToCompound(vector<ObjectCube>& pCompound);
+	void writePartToCopy(vector<ObjectCube>& pCopy);
+	void putTextToMat(int start, int end, Mat& mat, vector<vector<Point>>& contours);
+	void computeShift(vector<int>& shift, vector<ObjectCube>& pCompound);
 };
