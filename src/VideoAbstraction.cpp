@@ -646,7 +646,7 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 			partToCopyNum++;
 		}
 		else{
-			cout<<"put the event into the partToCompound ... "<<endl;
+			//cout<<"put the event into the partToCompound ... "<<endl;
 			partToCompound.push_back(ob);
 			vector<vector<bool>>().swap(ob.objectMask);
 			partToCompoundNum++;
@@ -787,11 +787,9 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 				cacheCollision[i][j][diff-1]=C;
 			}
 			q->AddPairwiseTerm(i, j, A, B, C, D);
-			//LOG(INFO)<<i<<"\t"<<j<<"\tA:"<<A<<"\tB:"<<B<<"\tC:"<<C<<"\t"<<B+C-A-D<<endl;
 			collision+=A;
 		}
 	}
-	//LOG(INFO)<<"计算碰撞耗时"<<clock()-starttime<<"豪秒\n";
 	printf("hit cache %d times\n",mcache);
 	printf("current collision:%d\n",collision);
 	q->Solve();
@@ -806,8 +804,7 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 				for(int j=0;j<n;++j){
 					cout<<"shift"<<j<<"\t"<<shift[j]<<"\t"<<ob[j].end-ob[j].start+1<<"\t"<<curMaxLength<<endl;
 				}
-				//cout<<"shift"<<i<<"\t"<<ob[i].length<<"\t"<<curMaxLength<<endl;
-				return -2;//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				return -2;
 			}
 
 		}
@@ -815,7 +812,6 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 	if(convergence)return -1;
 	for(int i=0;i<n;i++){
 		label=q->GetLabel(i);
-		//printf("%d: %d\n",i+1,label);
 		if(label>0){
 			shift[i]+=step;
 		}
@@ -823,33 +819,13 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 	return collision;
 }
 
+/*
+* 视频合成阶段 参数： 包含有结果文件名字的完整路径 eg. compound("F:/input/Test.avi")
+*/
 void VideoAbstraction::compound(string path){	
 	int testcount=0;
-	Outpath=path;									//获取合成文件的输出路径以及完整的文件名	videoCapture.open(Inputpath+InputName);			//合成操作前，需要提取背景图片信息保存到backgroundImage中
+	Outpath=path;	
 	backgroundImage=imread(InputName+"background.jpg");
-	//cout<<Outpath<<endl;
-	//cout<<"frame width "<<frameWidth<<endl;
-	//cout<<"frame height "<<frameHeight<<endl;
-	//cout<<Inputpath<<"   "<<InputName<<endl;
-	//cout<<scaleSize<<endl;
-	/*	videoWriter.open(Outpath, (int)videoCapture.get(CV_CAP_PROP_FOURCC), 
-	(double)videoCapture.get( CV_CAP_PROP_FPS ),
-	cv::Size(frameWidth*scaleSize, frameHeight*scaleSize),
-	true );	*/							  //输出视频的属性信息和输入视频的信息完全相同
-	//LOG(ERROR) <<"Can't create output video file: "<<Outpath<<endl;
-
-	//indexVideo
-	//Set the second @parameter -1
-	//indexWriter.open(Indexpath+"index_"+InputName, -1, 
-	//	(double)videoCapture.get( CV_CAP_PROP_FPS ),
-	//	cv::Size(frameWidth, frameHeight),
-	//	true );		
-
-	//if (!indexWriter.isOpened()){
-	//	LOG(ERROR) <<"Can't create output video file: "<<Indexpath+"index_"+InputName<<endl;
-	//	return;
-	//}
-
 	videoWriter.open(Outpath, (int)videoCapture.get(CV_CAP_PROP_FOURCC), 
 		(double)videoCapture.get(CV_CAP_PROP_FPS),
 		cv::Size(frameWidth, frameHeight),
@@ -983,7 +959,7 @@ void VideoAbstraction::compound(string path){
 					//获取偏移后的正确的位移
 					int currentIndex=j-shift[i];
 					currentIndex=getObjectIndex(i+ss*motionToCompound, currentIndex);
-					saveContorsOfResultFrameToFile(testcount, (i+ss*motionToCompound), currentIndex);
+					//saveContorsOfResultFrameToFile(testcount, (i+ss*motionToCompound), currentIndex);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
 				}
@@ -1131,6 +1107,78 @@ void VideoAbstraction::create_path(string path){
 	}
 }
 
+int VideoAbstraction::getObjectIndex(int number, int bias){
+	int result=0;
+	for(int i=0; i<number; i++){
+		result+=frame_end[i]-frame_start[i]+1;
+	}
+	result+=bias;
+	return result;
+}
+
+//将时间文本写到指定mat上
+void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<Point>>& contours){
+	vector<Point> info;
+	vector<vector<Point>>::const_iterator itc_re=contours.begin();
+	while(itc_re!=contours.end()){
+		if(contourArea(*itc_re) < objectarea){
+			itc_re=contours.erase(itc_re);
+		}
+		else{
+			convexHull(*itc_re,info);
+			Point p1 = info.at(1);
+			Point p2 = info.at(info.size()/2);
+			Point mid;
+			mid.x = (p1.x+p2.x)/2;
+			mid.y = (p1.y+p2.y)/2;
+			if(useROI){
+				mid.x += rectROI.x;
+				mid.y += rectROI.y;
+			}
+			int s1,s2,s3,e1,e2,e3;
+			s1=start/3600;
+			s2=(start%3600)/60;
+			s3=start%60;
+			e1=end/3600;
+			e2=(end%3600)/60;
+			e3=end%60;
+			putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
+			itc_re++;
+		}
+	}
+}
+
+void VideoAbstraction::computeShift(vector<int>& shift, vector<ObjectCube>& pCompound){
+	LOG(INFO)<<"开始计算shift"<<endl;
+	int min=INT_MAX,cur_collision=0;						
+	clock_t starttime=clock();
+	vector<int> tmpshift;
+	int *tempptr=(int *)cacheCollision;
+	int cache_size=sizeof(cacheCollision)/4;
+	for(int i=0;i<cache_size;i++){
+		tempptr[i]=-1;
+	}		
+	for(int randtime=0;randtime<1;++randtime){
+		LOG(INFO)<<"生成第"<<randtime+1<<"次初始点\n";
+		for(int i=0;i<shift.size();i++){					  //初始化偏移序列
+			shift[i]=0;
+		}
+		while(1){									   //计算满足冲突比较少的所有的偏移序列
+			cur_collision=graphCut(shift,pCompound);
+			LOG(INFO)<<"当前碰撞:"<<cur_collision<<endl;
+			if(cur_collision<0) break;
+			if(cur_collision<min){
+				min=cur_collision;
+				tmpshift=shift;
+			}
+		}
+	}
+	shift=tmpshift;
+	LOG(INFO)<<"最小损失"<<min<<endl;
+	LOG(INFO)<<"时间偏移计算耗时"<<clock()-starttime<<"豪秒\n";
+}
+
+
 std::string VideoAbstraction::getTempFilePath(int frame_num){
 	std::string fileName;
 	create_path(Inputpath+"Replay/"+InputName+"/");
@@ -1211,77 +1259,6 @@ bool VideoAbstraction::restoreMaskOfFram(cv::Mat& FrameMask, cv::Mat& oneContors
 }
 
 
-int VideoAbstraction::getObjectIndex(int number, int bias){
-	int result=0;
-	for(int i=0; i<number; i++){
-		result+=frame_end[i]-frame_start[i]+1;
-	}
-	result+=bias;
-	return result;
-}
-
 void VideoAbstraction::writePartToCompound(vector<ObjectCube>& pCompound){}
 
 void VideoAbstraction::writePartToCopy(vector<ObjectCube>& pCopy){}
-
-//将时间文本写到指定mat上
-void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<Point>>& contours){
-	vector<Point> info;
-	vector<vector<Point>>::const_iterator itc_re=contours.begin();
-	while(itc_re!=contours.end()){
-		if(contourArea(*itc_re) < objectarea){
-			itc_re=contours.erase(itc_re);
-		}
-		else{
-			convexHull(*itc_re,info);
-			Point p1 = info.at(1);
-			Point p2 = info.at(info.size()/2);
-			Point mid;
-			mid.x = (p1.x+p2.x)/2;
-			mid.y = (p1.y+p2.y)/2;
-			if(useROI){
-				mid.x += rectROI.x;
-				mid.y += rectROI.y;
-			}
-			int s1,s2,s3,e1,e2,e3;
-			s1=start/3600;
-			s2=(start%3600)/60;
-			s3=start%60;
-			e1=end/3600;
-			e2=(end%3600)/60;
-			e3=end%60;
-			putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
-			itc_re++;
-		}
-	}
-}
-
-void VideoAbstraction::computeShift(vector<int>& shift, vector<ObjectCube>& pCompound){
-	LOG(INFO)<<"开始计算shift"<<endl;
-	int min=INT_MAX,cur_collision=0;						
-	clock_t starttime=clock();
-	vector<int> tmpshift;
-	int *tempptr=(int *)cacheCollision;
-	int cache_size=sizeof(cacheCollision)/4;
-	for(int i=0;i<cache_size;i++){
-		tempptr[i]=-1;
-	}		
-	for(int randtime=0;randtime<1;++randtime){
-		LOG(INFO)<<"生成第"<<randtime+1<<"次初始点\n";
-		for(int i=0;i<shift.size();i++){					  //初始化偏移序列
-			shift[i]=0;
-		}
-		while(1){									   //计算满足冲突比较少的所有的偏移序列
-			cur_collision=graphCut(shift,pCompound);
-			LOG(INFO)<<"当前碰撞:"<<cur_collision<<endl;
-			if(cur_collision<0) break;
-			if(cur_collision<min){
-				min=cur_collision;
-				tmpshift=shift;
-			}
-		}
-	}
-	shift=tmpshift;
-	LOG(INFO)<<"最小损失"<<min<<endl;
-	LOG(INFO)<<"时间偏移计算耗时"<<clock()-starttime<<"豪秒\n";
-}

@@ -391,16 +391,23 @@ int main(){
 	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
 		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
 		"Cam3.avi", "Cam4.avi"};
-	string testset2[] = {"20110915_14-17-35.avi","20111202_082711.avi","20111202_101331.avi","大门口.avi","高档小区.avi","金融.avi","卡口 .avi",
+	string testset2[] = {"testvideo.avi", "20110915_14-17-35.avi","20111202_082711.avi","20111202_101331.avi","大门口.avi","高档小区.avi","金融.avi","卡口 .avi",
 		"三楼办公室.avi", "食堂1.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi"};
 
-	for(int i=0; i<testset2->size(); i++){	
-		string result_name="result_"+testset2[i];
-		string config_name="config_"+boost::lexical_cast<string>(i);
-		boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
-		test1.join();
-		cout<<"finished..."<<endl;
-	}
+	int testno=0;
+	string result_name="result_"+testset2[testno];
+	string config_name="config_"+testset2[testno];
+	boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, 2, true);
+	test1.join();
+	cout<<"finished..."<<endl;
+
+	//for(int i=0; i<testset2->size(); i++){	
+	//	string result_name="result_"+testset2[i];
+	//	string config_name="config_"+boost::lexical_cast<string>(i);
+	//	boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
+	//	test1.join();
+	//	cout<<"finished..."<<endl;
+	//}
 
 	//for(int i=0; i<testset1->size(); i++){	
 	//	string result_name="result_"+testset1[i];
