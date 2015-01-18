@@ -1,3 +1,11 @@
+//****************************************
+//user: PianoCoder
+//Create date: 2015/01/01
+//Class name:  VideoAbstraction  class header file
+//Discription: declare the necessary variable and interface
+//Update:      2015/01/17
+//****************************************
+
 #include <opencv2\opencv.hpp>
 #include <iostream>
 #include <string>
@@ -51,7 +59,8 @@ public:
 	int cacheShift;		
 	int frameWidth,frameHeight; 
 	int sumLength;					//压缩后视频的总长度
-	int objectarea;					//凸包最小的面积
+	float objectarea;					//凸包最小的面积
+	float thres;
 	
 	VideoCapture videoCapture;			//视频读写
 	VideoWriter videoWriter;
@@ -93,7 +102,7 @@ public:
 	int detectedMotion;				//检测到的运动序列的个数，每读够 motionToCompound个运动序列，写入一次文件
 	int motionToCompound;				//写入文件最少的运动序列数目+合成的运动序列最少数目
 	//Abstraction Model Part
-	int sum,thres;					//统计有运动序列的帧的数量  &  运动提取的阈值
+	int sum;					//统计有运动序列的帧的数量  &  运动提取的阈值
 	int currentLength,tempLength;		//
 
 	//***    GPU    ***//
@@ -142,6 +151,7 @@ public:
 	void saveObjectCube(ObjectCube &ob);													//存放运动序列到本地
 	int saveRemainObject();															//保存多出来的运动序列信息并返回包含有运动序列的图像帧的个数 赋值给 ObjectCubeNumber
 	void loadObjectCube(int index_start, int index_len);									//读取本地存放的运动序列
+	void loadObjectCube(int& currentIndex);												//从currentIndex开始取够8个运动序列到partToCompound中
 	string loadObjectCube(int bias, vector<vector<Point>>& contors);
 	void saveConfigInfo();																//存放配置信息
 	void LoadConfigInfo();																//读取本地存放的配置信息

@@ -1,3 +1,11 @@
+//****************************************
+//user: PianoCoder
+//Create date: 2015/01/01
+//Class name:  UserVideoAbstraction(...) class implemention
+//Discription: implement the interface for all the video abstraction operation
+//Update:      2015/01/17
+//****************************************
+
 #include "VideoAbstraction.h"
 #include "UserVideoAbstraction.h"
 
@@ -72,11 +80,11 @@ void UserVideoAbstraction::UsersetIndex(bool isindex){
 	userVB->setGpu(isindex);
 }
 
-void UserVideoAbstraction::UsersetMinArea(int minarea){
+void UserVideoAbstraction::UsersetMinArea(float minarea){
 	userVB->thres=minarea;
 }
 
-void UserVideoAbstraction::UsersetSingleMinArea(int minarea){
+void UserVideoAbstraction::UsersetSingleMinArea(float minarea){
 	userVB->objectarea=minarea;
 }
 

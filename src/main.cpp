@@ -11,8 +11,8 @@
 #include <time.h>
 
 #define MAX_INDEX_COUNT 1000
-#define SINAGLE_MIN_AREA 100  //test use 200
-#define MIN_AREA 200
+#define SINAGLE_MIN_AREA 200
+#define MIN_AREA 1000
 
 //declaration
 extern int readFrameLog(string logname);
@@ -150,7 +150,7 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 //test=3: you can replay the seleted object's event full process
 //test=4: you can view 9 snip-shots of the original video 
 /*****************************************************************/
-void testmultithread(string inputpath, string videoname, string midname, string outputname, int& frameCount, int CompoundCount, int stage, bool readlog){
+void testmultithread(string inputpath, string videoname, string midname, string outputname, int frameCount, int CompoundCount, int stage, bool readlog){
 //void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int scale, int stage){
 	time_t start_time,end_time;
 	start_time=time(NULL);
@@ -177,12 +177,13 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	int video_height=capture.get(CV_CAP_PROP_FRAME_HEIGHT);
 
 	float scale=1;
-	if (video_width>360)
+	int basewidth=360;
+	if (video_width>basewidth)
 	{
-		scale=((float)video_width)/360;
+		scale=((float)video_width)/basewidth;
 	}
 	//scale=1;
-
+	LOG(INFO)<<videoname<<endl;
 	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
 	user->UsersetGpu(true);
@@ -306,8 +307,6 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		imshow("video",image);
 		waitKey(0);
 		abstract_video.open(t3);
-		
-
 		while(abstract_video.read(image)){
 			currentFrameIndex++;	
 			//string filename=boost::lexical_cast<string>(currentFrameIndex)+".bmp";
@@ -316,7 +315,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 			index_image = user->userVB->loadContorsOfResultFrameFromFile(currentFrameIndex, image.rows, image.cols, loopuptable);
 			//Mat temp = user->userVB->loadContorsOfResultFrameFromFile(currentFrameIndex, image.rows, image.cols, loopuptable);
 			//imshow("temp", temp);
-			waitKey(30);
+			//waitKey(30);
 			//imshow("index", index_image);
 			setMouseCallback("video",mouseRecover);
 			int key = waitKey(30); 
@@ -324,6 +323,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 				waitKey(0);
 		}
 	}
+
 	else if(test==4){
 		string t1=inputpath,t2=midname,t3=videoname,temp;
 		int frCount;
@@ -375,25 +375,26 @@ int main(){
 	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
 		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
 		"Cam3.avi", "Cam4.avi"};
-	string testset2[] = {"testvideo.avi", "高档小区.avi", "20110915_14-17-35.avi","20111202_082711.avi","20111202_101331.avi","大门口.avi","金融.avi","卡口 .avi",
-		"三楼办公室.avi", "食堂1.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi"};
+	string testset2[] = {"卡口 .avi", "三楼办公室.avi", "高档小区.avi", "testvideo.avi",  "20110915_14-17-35.avi","20111202_082711.avi","20111202_101331.avi","金融.avi",
+		 "食堂1.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi"};
 
-	int testno=0,choice;
-	string result_name="result_"+testset2[testno];
-	string config_name="config_"+testset2[testno];
-	cout<<"input your choice: ";
-	cin>>choice;
-	boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, choice, true);
-	test1.join();
-	cout<<"finished..."<<endl;
+	//int testno=4,choice;
+	//string result_name="result_"+testset2[testno];
+	//cout<<result_name<<endl;
+	//string config_name="config_csmall";
+	//cout<<"input your choice: ";
+	//cin>>choice;
+	////boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, choice, true);
+	//test1.join();
+	//cout<<"finished..."<<endl;
 
-	//for(int i=0; i<testset2->size(); i++){	
-	//	string result_name="result_"+testset2[i];
-	//	string config_name="config_"+boost::lexical_cast<string>(i);
-	//	boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
-	//	test1.join();
-	//	cout<<"finished..."<<endl;
-	//}
+	for(int i=0; i<testset2->size(); i++){	
+		string result_name="result_"+testset2[i];
+		string config_name="config_"+testset2[i];
+		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
+		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 2, true);
+		cout<<"finished..."<<endl;
+	}
 
 	//for(int i=0; i<testset1->size(); i++){	
 	//	string result_name="result_"+testset1[i];

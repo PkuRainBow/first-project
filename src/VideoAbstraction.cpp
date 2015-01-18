@@ -293,7 +293,6 @@ int VideoAbstraction::ComponentLable(Mat& fg_mask, vector<Rect>& vComponents_out
 							up_pos = cur_y -1;							
 					}
 				}
-
 			}
 
 			rWidth=CV_IABS((right_pos-left_pos));
@@ -455,8 +454,10 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 
 
 void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前背景分离函数
-	if(scaleSize != 1)
+	//cout<<objectarea<<"  "<<thres<<endl;
+	if(scaleSize > 1)
 	{
+		//pyrDown(currentFrame, currentFrame, Size(frameWidth,frameHeight));
 		resize(currentFrame, currentFrame, Size(frameWidth,frameHeight));
 	}
 	if(50==frameIndex)								//如果中间文件原来已经存在，则执行清空操作
@@ -464,7 +465,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 		ofstream file_flush(Configpath+MidName, ios::trunc);
 	}
 	if(frameIndex <= 50)
-	{							//初始化混合高斯 取前50帧图像来更新背景信息  提示：取值50仅供参考，并非必须是50
+	{										   //初始化混合高斯 取前50帧图像来更新背景信息  提示：取值50仅供参考，并非必须是50
 		if(useGpu)
 		{
 			//gpu module
@@ -503,7 +504,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
 			//freopen("exe.txt","a",stdout);
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
-			if(sum>(thres/(scaleSize*scaleSize)))
+			if(sum>thres)
 			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				//cout<<"points number : "<<sum<<endl;
 				flag=true;
@@ -536,7 +537,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 						{								//运动序列的长度太长，是无意义的运动序列，直接丢弃
 							detectedMotion--;
 						} 
-						else if(currentLength>maxLengthToSpilt*5)
+						else if(currentLength>maxLengthToSpilt*2)
 						{							//事件过长 进行切分处理
 							LOG(INFO)<<"事件过长:"<<currentLength<<endl;
 							int spilt=currentLength/maxLengthToSpilt+1;
@@ -624,6 +625,69 @@ string VideoAbstraction::loadObjectCube(int bias, vector<vector<Point>>& contour
 	return temp;
 }
 
+
+void VideoAbstraction::loadObjectCube(int& currentIndex){
+	partToCompoundNum=0;
+	partToCopyNum=0;
+	ifstream file(Configpath+MidName);
+	string temp;
+	/*
+	*filter the first loadIndex Sequence ...
+	*/
+	for(int i=0; i<loadIndex; i++) 
+	{
+		getline(file, temp, '#');
+	}
+	/*
+	*  load 8 sequences into the partToCompound or break if the scene change happens ...
+	*/
+	int length=0;
+	ObjectCube ob;
+	vector<vector<Point>> contors;
+	bool scene_change=false;
+	cout<<"vector size "<<frame_start.size()<<endl;
+	while(partToCompoundNum < motionToCompound && currentIndex < EventNum){
+		int j=currentIndex++;
+		int changeSceneNum=0;
+		cout<<"event no. "<<j<<endl;
+		cout<<frame_start[j]<<"\t"<<frame_end[j]<<endl;
+		ob.start=frame_start[j];
+		ob.end=frame_end[j];
+		length=frame_end[j]-frame_start[j]+1;
+		loadIndex+=length;		
+		for(int i=0;i<length;++i)
+		{
+			vector<vector<Point>>().swap(contors);
+			getline(file, temp, '#');
+			contors=stringToContors(temp);
+			Mat bb(frameHeight,frameWidth,CV_8U,Scalar::all(0));
+			drawContours(bb,contors,-1,Scalar(255),-1);
+			//check whether the view is changed
+			int elecount=countNonZero(bb);
+			if((double)elecount/(frameWidth*frameHeight) > 0.5)	changeSceneNum+=1;
+			ob.objectMask.push_back(matToVector(bb));	
+		}
+		vector<vector<Point>>().swap(contors);
+		curMaxLength=max(length,curMaxLength);
+		//view change
+		if(changeSceneNum > 20)
+		{
+			cout<<"put the event into the partToCopy ... "<<endl;
+			partToCopy.push_back(ob);
+			vector<vector<bool>>().swap(ob.objectMask);
+			partToCopyNum++;
+			break;
+		}
+		else
+		{
+			//cout<<"put the event into the partToCompound ... "<<endl;
+			partToCompound.push_back(ob);
+			vector<vector<bool>>().swap(ob.objectMask);
+			partToCompoundNum++;
+		}
+	}
+}
+
 void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指定事件序列号范围内的运动帧导入 partToCompound 和 partToCopy 中
 	partToCompoundNum=0;
 	partToCopyNum=0;
@@ -636,7 +700,6 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 	int length=0;
 	ObjectCube ob;
 	vector<vector<Point>> contors;
-	bool scene_change=false;
 	for(int j=index_start; j<=index_end; j++)
 	{
 		cout<<frame_start[j]<<"\t"<<frame_end[j]<<endl;
@@ -660,13 +723,13 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 		vector<vector<Point>>().swap(contors);
 		curMaxLength=max(length,curMaxLength);
 		//view change
-		if(changeSceneNum > 20 || scene_change)
+		if(changeSceneNum > 20)
 		{
 			cout<<"put the event into the partToCopy ... "<<endl;
-			scene_change=true;
 			partToCopy.push_back(ob);
 			vector<vector<bool>>().swap(ob.objectMask);
 			partToCopyNum++;
+			break;
 		}
 		else
 		{
@@ -855,12 +918,13 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 void VideoAbstraction::compound(string path){	
 	int testcount=-1;
 	Outpath=path;	
+	cout<<Outpath<<endl;
 	backgroundImage=imread(InputName+"background.jpg");
-	videoWriter.open(Outpath, (int)videoCapture.get(CV_CAP_PROP_FOURCC), 
+	videoWriter.open(Outpath, 1, 
 		(double)videoCapture.get(CV_CAP_PROP_FPS),
 		cv::Size(frameWidth, frameHeight),
 		true );		
-
+	cout<<Outpath<<endl;
 	if (!videoWriter.isOpened())
 	{
 		LOG(ERROR) <<"Can't create output video file: "<<Outpath<<endl;
@@ -873,11 +937,19 @@ void VideoAbstraction::compound(string path){
 
 	cout<<"进入摘要视频合成..."<<endl;
 	clock_t starttime = clock();
-	int index=0;
-	for(int ss=0; ss<AverageCount || 0==AverageCount; ss++)  //视频摘要合成的主循环
+	int currentIndex=0;
+	int compoundSeqNumber=1;
+	loadIndex=0;
+	EventNum=frame_start.size();
+
+	/*
+	*  the main loop to fetch 8 event sequences or <8 videos with view change happened until all the event sequences dealt with ...
+	*/
+	while(currentIndex < EventNum)
 	{			
 		int synopsis=motionToCompound;
-		LOG(INFO)<<"*** 第"<<ss+1<<"次 ***"<<endl;
+		int offset=currentIndex;
+		LOG(INFO)<<"*** 第"<<compoundSeqNumber++<<"次 ***"<<endl;
 		/*
 		* 导入需要进行合并的凸包序列到内存中
 		*/
@@ -885,29 +957,8 @@ void VideoAbstraction::compound(string path){
 		vector<ObjectCube>().swap(partToCompound);
 		vector<ObjectCube>().swap(partToCopy);
 		maxLength=0;
-		curMaxLength=0;		
-		if(0==AverageCount)  //如果运动序列小于motionToCompound个，则只需要对所有的运动序列进行一次合成操作即可！
-		{									
-			if(0==ObjectCount) 
-			{ 
-				cout<<"没有运动序列"<<endl; return;
-			}
-			else 
-			{
-				loadObjectCube(ss, ss+RemainCount-1);            //从中间的凸包文件中读取运动序列到 partToCompound 中
-				synopsis=ObjectCount;
-				AverageCount=-1;
-			}
-		}
-		else if(ss==AverageCount-1)
-		{							//如果RemainCount不为0，则最后一次合成的时候，合成 motionToCompound+RemainCount 个运动序列
-			loadObjectCube(ss*motionToCompound, (ss+1)*motionToCompound+RemainCount-1);
-			synopsis=motionToCompound+RemainCount;
-		}
-		else
-		{												//正常合成 motionToCompound 个运动序列
-			loadObjectCube(ss*motionToCompound, (ss+1)*motionToCompound-1);	
-		}
+		curMaxLength=0;														//正常合成 motionToCompound 个运动序列
+		loadObjectCube(currentIndex);	
 		/*
 		* 计算需要合成的序列的偏移量
 		*/
@@ -954,38 +1005,22 @@ void VideoAbstraction::compound(string path){
 					}
 				}
 			}
-			int baseIndex, remainIndex; 
 			if(earliestIndex>-1)
 			{
-				baseIndex=(earliestIndex+ss*motionToCompound)/256;
-				remainIndex=(earliestIndex+ss*motionToCompound)%256;
+				//baseIndex=(earliestIndex+ss*motionToCompound)/256;
+				//remainIndex=(earliestIndex+ss*motionToCompound)%256;
 				haveFrame=true;
 				videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[earliestIndex].start-1+j-shift[earliestIndex]);
 				videoCapture>>currentFrame;
 				resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
+				//pyrDown(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 				currentResultFrame=currentFrame.clone();
 				resultMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);
 				//
 				int currentIndex=j-shift[earliestIndex]+1;
-				currentIndex=getObjectIndex(earliestIndex+ss*motionToCompound, currentIndex);
-				saveContorsOfResultFrameToFile(testcount, (earliestIndex+ss*motionToCompound), currentIndex);
-				//
-				for(int ii=0; ii<indexMat.rows; ii++)
-				{
-					uchar* pi=indexMat.ptr<uchar>(ii);
-					uchar* ptr_re=resultMask.ptr<uchar>(ii);
-					for(int jj=0; jj<indexMat.cols;jj++)
-					{
-						pi[jj]=(earliestIndex+ss*motionToCompound)%256;
-						//pi[jj]=remainIndex;
-						if(255==ptr_re[jj])
-						{
-							pi[jj]=255-pi[jj];
-						}
-					}
-				}
+				currentIndex=getObjectIndex(earliestIndex+offset, currentIndex);
+				//saveContorsOfResultFrameToFile(testcount, (earliestIndex+offset), currentIndex);
 			}
-
 			if(!haveFrame)
 			{
 				cout<<"没有找到最早\n";
@@ -1002,12 +1037,13 @@ void VideoAbstraction::compound(string path){
 				{
 					videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[i].start-1+j-shift[i]); //设置背景图片
 					videoCapture>>currentFrame;
+					//pyrDown(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 					resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 					currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
 					//获取偏移后的正确的位移
 					int currentIndex=j-shift[i]+1;
-					currentIndex=getObjectIndex(i+ss*motionToCompound, currentIndex);
-					saveContorsOfResultFrameToFile(testcount, (i+ss*motionToCompound), currentIndex);
+					currentIndex=getObjectIndex(i+offset, currentIndex);
+					//saveContorsOfResultFrameToFile(testcount, (i+offset), currentIndex);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
 				}
@@ -1040,6 +1076,7 @@ void VideoAbstraction::compound(string path){
 					videoCapture.set(CV_CAP_PROP_POS_FRAMES,j+base_index);
 					videoCapture>>currentResultFrame;
 					resize(currentResultFrame, currentResultFrame, Size(frameWidth, frameHeight));
+					//pyrDown(currentResultFrame, currentResultFrame, Size(frameWidth, frameHeight));
 					//put the time tag info into the readed frame...
 					vector<Point> info;
 					vector<vector<Point>> re_contours;	
@@ -1353,7 +1390,6 @@ bool VideoAbstraction::restoreMaskOfFrame(cv::Mat& FrameMask, cv::Mat& eventMask
 	}
 	return true;
 }
-
 
 void VideoAbstraction::writePartToCompound(vector<ObjectCube>& pCompound){}
 
