@@ -23,6 +23,11 @@
 #include <boost/thread/thread.hpp>
 #include "boost/filesystem.hpp"
 #include <boost/lexical_cast.hpp>
+
+#include <boost/format.hpp>     
+#include <boost/tokenizer.hpp>     
+#include <boost/algorithm/string.hpp> 
+
 /*
  *Boost Filesystem库提供了对路径、文件和目录进行查询和操作提供了可一直的工具 所有的内容都处于名空间 boost::filesystem 中
  * boost::lexical_cast<string>(i)  把（）中的数据类型转变成< >中的数据类型
@@ -163,7 +168,6 @@ public:
 	void freeObject();																	//显式的析构功能函数
 	void setGpu(bool isgpu);
 	void setROI(bool isroi);
-	void setIndex(bool isindex);
 	void writeMask(Mat& input, Mat& output, int index);
 	void getKeyFrame(string keyframe_path);
 	void create_path(string path);

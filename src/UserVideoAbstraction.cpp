@@ -74,11 +74,13 @@ void UserVideoAbstraction::UsersetROI(Rect rectroi){
 	//userVB->rectROI.height=rectroi.height;
 	userVB->rectROI.x=rectroi.x;
 	userVB->rectROI.y=rectroi.y;
+	userVB->rectROI.width=rectroi.width;
+	userVB->rectROI.height=rectroi.height;
 }
 
-void UserVideoAbstraction::UsersetIndex(bool isindex){
-	userVB->setGpu(isindex);
-}
+//void UserVideoAbstraction::UsersetIndex(bool isindex){
+//	userVB->setGpu(isindex);
+//}
 
 void UserVideoAbstraction::UsersetMinArea(float minarea){
 	userVB->thres=minarea;

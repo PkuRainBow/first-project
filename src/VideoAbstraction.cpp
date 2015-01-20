@@ -11,7 +11,7 @@ VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log
 	init();
 	scaleSize=size;
 	objectarea=100/(scaleSize*scaleSize);
-	thres=1000;
+	thres=0.001;
 	useGpu=true;
 	Inputpath=inputpath;
 	Outpath=out_path;
@@ -48,7 +48,7 @@ void VideoAbstraction::init(){
 	maxLength=-1;
 	maxLengthToSpilt=300;
 	sum=0;
-	thres=100;
+	thres=0.001;
 	currentLength=0;
 	tempLength=0;
 	noObjectCount=0;
@@ -170,45 +170,15 @@ void VideoAbstraction::stitch(Mat &input1,Mat &input2,Mat &output,Mat &back,Mat 
 			}
 		}
 	}
-	//if(frameno%5==0){
-		start = start/framePerSecond;
-		end = end/framePerSecond;
-		vector<vector<Point>> m_contours;
-		vector<Point> info(0,0);
-		findContours(mask,m_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
-		vector<vector<Point>>::const_iterator itc=m_contours.begin();
-
-		while(itc!=m_contours.end()){
-			if(contourArea(*itc) < objectarea){
-				itc=m_contours.erase(itc);
-			}
-			else{
-				convexHull(*itc,info);
-				Point p1 = info.at(1);
-				Point p2 = info.at(info.size()/2);
-				Point mid;
-				mid.x = (p1.x+p2.x)/2;
-				mid.y = (p1.y+p2.y)/2;
-				if(useROI){
-					mid.x += rectROI.x;
-					mid.y += rectROI.y;
-					//cout<<rectROI.x<<"***"<<rectROI.y<<endl;
-				}
-				//putText(output,int2string(start)+"-"+int2string(end),mid,CV_FONT_HERSHEY_COMPLEX,0.2, Scalar(0,0,255),1);
-				//itc++;
-				int s1,s2,s3,e1,e2,e3;
-				s1=start/3600;
-				s2=(start%3600)/60;
-				s3=start%60;
-				e1=end/3600;
-				e2=(end%3600)/60;
-				e3=end%60;
-				//putText(output,int2string(start)+"-"+int2string(end),mid,CV_FONT_HERSHEY_COMPLEX,0.2, Scalar(0,0,255),1);
-				putText(output,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
-				itc++;
-			}
-		}
-	//}
+	/*
+	* put the time tag on all the convex hull
+	*/
+	start = start/framePerSecond;
+	end = end/framePerSecond;
+	vector<vector<Point>> m_contours;
+	vector<Point> info(0,0);
+	findContours(mask,m_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
+	putTextToMat(start, end, output, m_contours);
 }
 
 int VideoAbstraction::ComponentLable(Mat& fg_mask, vector<Rect>& vComponents_out, int area_threshold)
@@ -504,10 +474,19 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
 			//freopen("exe.txt","a",stdout);
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
-			if(sum>thres)
+			if(!useROI && sum/(frameHeight*frameWidth)>thres)
 			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				//cout<<"points number : "<<sum<<endl;
 				flag=true;
+			}
+			if(useROI && sum/(rectROI.width*rectROI.height)>thres)
+			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
+				//cout<<"points number : "<<sum<<endl;
+				flag=true;
+			}
+			else
+			{
+				flag=false;
 			}
 		}
 		if(flag)
@@ -530,7 +509,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 				{														//已经有连续15帧无运动序列，运动结束  存储运动序列
 					currentObject.end=frameIndex-15;
 					if(currentObject.end-currentObject.start>30)
-					{								//运动序列长度大于 50 才认为是有效运动，否则不认为其是运动的
+					{								//运动序列长度大于 30 才认为是有效运动，否则不认为其是运动的
 						detectedMotion++;
 						currentLength=currentObject.end-currentObject.start+1;
 						if(currentLength>maxLengthToSpilt*10)
@@ -645,11 +624,11 @@ void VideoAbstraction::loadObjectCube(int& currentIndex){
 	ObjectCube ob;
 	vector<vector<Point>> contors;
 	bool scene_change=false;
-	cout<<"vector size "<<frame_start.size()<<endl;
+	//cout<<"vector size "<<frame_start.size()<<endl;
 	while(partToCompoundNum < motionToCompound && currentIndex < EventNum){
 		int j=currentIndex++;
 		int changeSceneNum=0;
-		cout<<"event no. "<<j<<endl;
+		//cout<<"event no. "<<j<<endl;
 		cout<<frame_start[j]<<"\t"<<frame_end[j]<<endl;
 		ob.start=frame_start[j];
 		ob.end=frame_end[j];
@@ -920,10 +899,8 @@ void VideoAbstraction::compound(string path){
 	Outpath=path;	
 	cout<<Outpath<<endl;
 	backgroundImage=imread(InputName+"background.jpg");
-	videoWriter.open(Outpath, 1, 
-		(double)videoCapture.get(CV_CAP_PROP_FPS),
-		cv::Size(frameWidth, frameHeight),
-		true );		
+	int ex = static_cast<int>(videoCapture.get(CV_CAP_PROP_FOURCC));
+	videoWriter.open(Outpath, ex, videoCapture.get(CV_CAP_PROP_FPS),cv::Size(frameWidth, frameHeight), true);		
 	cout<<Outpath<<endl;
 	if (!videoWriter.isOpened())
 	{
@@ -1057,13 +1034,15 @@ void VideoAbstraction::compound(string path){
 				findContours(resultMask,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
 				putTextToMat(start, end, currentResultFrame, re_contours);
 			}
+			rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
+				Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize), CV_RGB(0,255,0),2);
 			videoWriter.write(currentResultFrame);
 		}
 		//deal with the scene change cases ...
-		cout<<"*************    partToCopy part    ***********"<<endl;
-		cout<<"Copy sequences number: "<<partToCopyNum<<endl;
 		if(partToCopyNum>0)
 		{
+			cout<<"*************    partToCopy part    ***********"<<endl;
+			cout<<"Copy sequences number: "<<partToCopyNum<<endl;
 			for(int i=0; i<partToCopyNum; i++)
 			{
 				int start = partToCopy[i].start/framePerSecond;
@@ -1083,6 +1062,8 @@ void VideoAbstraction::compound(string path){
 					Mat mat1=vectorToMat(partToCopy[i].objectMask[j],frameHeight,frameWidth);
 					findContours(mat1,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
 					putTextToMat(start, end, currentResultFrame, re_contours);
+					rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
+						Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize),CV_RGB(0,255,0),2);
 					videoWriter.write(currentResultFrame);
 				}
 			}
@@ -1248,8 +1229,8 @@ void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<
 			mid.y = (p1.y+p2.y)/2;
 			if(useROI)
 			{
-				mid.x += rectROI.x;
-				mid.y += rectROI.y;
+				mid.x += rectROI.x/scaleSize;
+				mid.y += rectROI.y/scaleSize;
 			}
 			int s1,s2,s3,e1,e2,e3;
 			s1=start/3600;

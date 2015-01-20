@@ -10,13 +10,14 @@
 #include "UserVideoAbstraction.h"
 #include <time.h>
 
+
 #define MAX_INDEX_COUNT 1000
 #define SINAGLE_MIN_AREA 200
-#define MIN_AREA 1000
+#define MIN_AREA_RATE 0.001
 
 //declaration
 extern int readFrameLog(string logname);
-extern void readAreaLog(string logname, int &base_x, int &base_y);
+extern void readAreaLog(string logname, int &base_x, int &base_y, int& base_w, int& base_h);
 extern Mat MultiImage(const vector<Mat>& SrcImg_V, Size ImgMax_Size);
 extern void video_play(long index);
 extern void create_path(string path);
@@ -177,7 +178,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	int video_height=capture.get(CV_CAP_PROP_FRAME_HEIGHT);
 
 	float scale=1;
-	int basewidth=360;
+	int basewidth=720;
 	if (video_width>basewidth)
 	{
 		scale=((float)video_width)/basewidth;
@@ -186,10 +187,10 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	LOG(INFO)<<videoname<<endl;
 	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
-	user->UsersetGpu(true);
-	user->UsersetIndex(false);
+	user->UsersetGpu(false);
+	//user->UsersetIndex(false);
 	user->UsersetSingleMinArea(SINAGLE_MIN_AREA/(scale*scale));
-	user->UsersetMinArea(MIN_AREA/(scale*scale));
+	user->UsersetMinArea(MIN_AREA_RATE);
 
 	int test = stage;
 	ofstream ff(log_path+"TimeLog.txt", ofstream::app);
@@ -202,30 +203,26 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		ofstream ff(log_path+"FrameLog.txt", ofstream::app);
 		ff<<endl<<videoname<<"\t"<<capture.get(CV_CAP_PROP_FRAME_COUNT);
 		int number=0;
-		setROI=false;
+		//setROI=false;
 		while (capture.read(image))
 		{
-			//if(number==0){
-			//	namedWindow("video");
-			//	imshow("video",image);
-			//	setMouseCallback("video",mouseSelect);
-			//	waitKey(0);
-			//	cvDestroyWindow("video");
-			//	//user->UsersetROI(selectarea);
-			//	ofstream ff(log_path+"AreaLog.txt", ofstream::app);
-			//	ff<<endl<<selectarea.x<<":"<<selectarea.y;
-			//}
+			if(setROI && number==0){
+				namedWindow("video");
+				imshow("video",image);
+				setMouseCallback("video",mouseSelect);
+				waitKey(0);
+				cvDestroyWindow("video");
+				//user->UsersetROI(selectarea);
+				ofstream ff(log_path+"AreaLog.txt", ofstream::app);
+				ff<<endl<<selectarea.x<<":"<<selectarea.y<<":"<<selectarea.width<<":"<<selectarea.height;
+				//float roi_rate=(video_width*video_height)/(selectarea.width*selectarea.height);
+				//LOG(INFO)<<selectarea.width<<" "<<selectarea.height<<endl;
+				//LOG(INFO)<<video_width<<" "<<video_height<<endl;
+				//LOG(INFO)<<roi_rate<<endl;
+				//user->UsersetMinArea(MIN_AREA/(scale*scale*roi_rate));
+				//LOG(INFO)<<"THRES: "<<user->userVB->thres<<endl;
+			}
 			if(setROI){
-				if(number==0){
-					namedWindow("video");
-					imshow("video",image);
-					setMouseCallback("video",mouseSelect);
-					waitKey(0);
-					cvDestroyWindow("video");
-					//user->UsersetROI(selectarea);
-					ofstream ff(log_path+"AreaLog.txt", ofstream::app);
-					ff<<endl<<selectarea.x<<":"<<selectarea.y;
-				}
 				number++;
 				image(selectarea).copyTo(imageRoi);
 				user->UserAbstraction(imageRoi,number);
@@ -246,10 +243,16 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		state="compound the result video";
 		string t3 = out_path+outputname;
 		if(setROI){
-			int x,y;
-			readAreaLog(log_path+"AreaLog.txt", x, y);
-			Rect selectRoi(x,y,100,100);
+			int x,y,width,height;
+			readAreaLog(log_path+"AreaLog.txt", x, y, width, height);
+			Rect selectRoi(x,y,width,height);
 			user->UsersetROI(selectRoi);
+
+			float roi_rate=(video_width*video_height)/(width*height);
+			LOG(INFO)<<video_width<<" "<<video_height<<endl;
+			LOG(INFO)<<width<<" "<<height<<endl;
+			LOG(INFO)<<roi_rate<<endl;
+			//user->UsersetMinArea(MIN_AREA/(scale*scale*roi_rate));
 		}
 		int frCount;
 		if(readlog)
@@ -375,26 +378,32 @@ int main(){
 	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
 		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
 		"Cam3.avi", "Cam4.avi"};
-	string testset2[] = {"卡口 .avi", "三楼办公室.avi", "高档小区.avi", "testvideo.avi",  "20110915_14-17-35.avi","20111202_082711.avi","20111202_101331.avi","金融.avi",
-		 "食堂1.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi"};
+	string testset2[] = {"三楼办公室.avi", "gaodangxiaoqu.avi", "testvideo.avi", "金融.avi","食堂1.avi", "20110915_14-17-35.avi",
+		   "20111202_082711.avi","20111202_101331.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi", "卡口 .avi"};
 
-	//int testno=4,choice;
-	//string result_name="result_"+testset2[testno];
-	//cout<<result_name<<endl;
-	//string config_name="config_csmall";
+	int testno=1,choice;
+	string result_name="result";
+	cout<<result_name<<endl;
+	string config_name="config";
+	if(setROI)
+	{
+		result_name="ROI";
+		config_name+="ROI";
+	}
 	//cout<<"input your choice: ";
 	//cin>>choice;
-	////boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, choice, true);
-	//test1.join();
-	//cout<<"finished..."<<endl;
+	//boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, choice, true);
+	testmultithread("F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, 1, true);
+	testmultithread("F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, 2, true);
+	cout<<"finished..."<<endl;
 
-	for(int i=0; i<testset2->size(); i++){	
-		string result_name="result_"+testset2[i];
-		string config_name="config_"+testset2[i];
-		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
-		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 2, true);
-		cout<<"finished..."<<endl;
-	}
+	//for(int i=2; i<3; i++){	
+	//	string result_name="result_"+testset2[i]+"cpu";
+	//	string config_name="config_"+testset2[i]+"cpu";
+	//	testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
+	//	testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 2, true);
+	//	cout<<"finished..."<<endl;
+	//}
 
 	//for(int i=0; i<testset1->size(); i++){	
 	//	string result_name="result_"+testset1[i];
@@ -438,7 +447,7 @@ int readFrameLog(string logname){
 	return 0;
 }
 
-void readAreaLog(string logname, int &base_x, int &base_y){
+void readAreaLog(string logname, int &base_x, int &base_y, int& base_w, int& base_h){
 	ifstream fin;
 	fin.open(logname);
 	if(fin.is_open()) {
@@ -461,10 +470,12 @@ void readAreaLog(string logname, int &base_x, int &base_y){
 		string lastLine;            
 		getline(fin,lastLine);                      // Read the current line
 		cout<< lastLine<<'\n';     // Display it
-		string x = lastLine.substr(0,lastLine.find(":"));
-		string y = lastLine.substr(lastLine.find(":")+1);
-		base_x = atoi(x.c_str());
-		base_y = atoi(y.c_str());
+		vector<string> elem;
+		boost::split(elem, lastLine, boost::is_any_of(":"));
+		base_x = boost::lexical_cast<int>(elem[0]);
+		base_y = boost::lexical_cast<int>(elem[1]);
+		base_w = boost::lexical_cast<int>(elem[2]);
+		base_h = boost::lexical_cast<int>(elem[3]);
 		fin.close();
 	}
 }
