@@ -66,16 +66,12 @@ void UserVideoAbstraction::UsersetGpu(bool isgpu){
 }
 
 void UserVideoAbstraction::UsersetROI(Rect rectroi){	
-	//userVB->setROI(isroi);
 	userVB->useROI=true;
-	//userVB->frameHeight=rectroi.height;
-	//userVB->frameWidth=rectroi.width;
-	//userVB->rectROI.width=rectroi.width;
-	//userVB->rectROI.height=rectroi.height;
 	userVB->rectROI.x=rectroi.x;
 	userVB->rectROI.y=rectroi.y;
 	userVB->rectROI.width=rectroi.width;
 	userVB->rectROI.height=rectroi.height;
+	userVB->setFilter(userVB->roiFilter, userVB->rectROI, userVB->frameHeight*userVB->frameWidth);
 }
 
 //void UserVideoAbstraction::UsersetIndex(bool isindex){

@@ -41,7 +41,7 @@ int small_height;//每个小图的高度
 //setROI=false by default 
 Rect selectarea;
 bool select_flag=false;
-bool setROI=false;
+bool setROI=true;
 Mat image,imageRoi,showimage,index_image;
 //Video Index
 int currentFrameIndex=0;
@@ -178,13 +178,13 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	int video_height=capture.get(CV_CAP_PROP_FRAME_HEIGHT);
 
 	float scale=1;
-	int basewidth=720;
+	int basewidth=360;
 	if (video_width>basewidth)
 	{
 		scale=((float)video_width)/basewidth;
 	}
 	//scale=1;
-	LOG(INFO)<<videoname<<endl;
+	LOG(INFO)<<videoname<<" scale = "<<scale<<endl;
 	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
 	user->UsersetGpu(false);
@@ -222,15 +222,17 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 				//user->UsersetMinArea(MIN_AREA/(scale*scale*roi_rate));
 				//LOG(INFO)<<"THRES: "<<user->userVB->thres<<endl;
 			}
-			if(setROI){
-				number++;
-				image(selectarea).copyTo(imageRoi);
-				user->UserAbstraction(imageRoi,number);
-			}
-			else{
-				number++;
-				user->UserAbstraction(image,number);
-			}
+			//if(setROI){
+			//	number++;
+			//	image(selectarea).copyTo(imageRoi);
+			//	user->UserAbstraction(imageRoi,number);
+			//}
+			//else{
+			//	number++;
+			//	user->UserAbstraction(image,number);
+			//}
+			number++;
+			user->UserAbstraction(image,number);
 		}
 		int UsedFrameCount = user->UsersaveConfigInfo();
 		frameCount=UsedFrameCount;
@@ -382,13 +384,13 @@ int main(){
 		   "20111202_082711.avi","20111202_101331.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi", "卡口 .avi"};
 
 	int testno=1,choice;
-	string result_name="result";
+	string result_name="original_result_"+testset2[testno];
 	cout<<result_name<<endl;
 	string config_name="config";
 	if(setROI)
 	{
-		result_name="ROI";
-		config_name+="ROI";
+		result_name="ROI"+result_name;
+		config_name="ROI"+config_name;
 	}
 	//cout<<"input your choice: ";
 	//cin>>choice;

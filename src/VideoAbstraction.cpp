@@ -7,7 +7,7 @@
 //****************************************
 #include "VideoAbstraction.h"
 //
-VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname, int size){
+VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname, float size){
 	init();
 	scaleSize=size;
 	objectarea=100/(scaleSize*scaleSize);
@@ -474,26 +474,18 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
 			//freopen("exe.txt","a",stdout);
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
-			if(!useROI && sum/(frameHeight*frameWidth)>thres)
+			if((double)sum/(frameHeight*frameWidth)>thres)
+			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
+				flag=true;
+			}
+			if(useROI && (double)sum/(rectROI.width*rectROI.height)>thres)
 			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				//cout<<"points number : "<<sum<<endl;
 				flag=true;
-			}
-			if(useROI && sum/(rectROI.width*rectROI.height)>thres)
-			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
-				//cout<<"points number : "<<sum<<endl;
-				flag=true;
-			}
-			else
-			{
-				flag=false;
 			}
 		}
 		if(flag)
 		{							   //判断当前的图像帧是否包含有意义的运动序列信息
-			//imshow("check", currentMask);
-			//cout<<"area rate : "<<(double)sum/(frameHeight*frameWidth)<<endl;
-			//waitKey(0);
 			currentObject.objectMask.push_back(matToVector(currentMask));					//将当前帧添加到运动序列中
 			if(currentObject.start<0) currentObject.start=frameIndex;
 			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*10)	//当前运动序列太长，认为其实无意义的运动序列（比如一直摇动的树叶信息或者光线变化），则清空成功新开始
@@ -532,10 +524,27 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 								{
 									temp.objectMask.push_back(currentObject.objectMask[i*spiltLength+j]);
 								}
-								saveObjectCube(temp);
-								maxLength=max(tempLength,maxLength);
-								LOG(INFO)<<"事件"<<detectedMotion<<"\t开始帧"<<temp.start<<"\t结束帧"<<temp.end<<"\t长度"<<(temp.end-temp.start)*1.0/framePerSecond<<"秒"<<endl;
-								detectedMotion++;
+								/*
+							     *  filter the NO ROI 
+							     */
+								if(useROI)
+								{
+									bool test = checkROI(temp, roiFilter);
+									if(test)
+									{
+										saveObjectCube(temp);
+										maxLength=max(tempLength,maxLength);
+										LOG(INFO)<<"事件"<<detectedMotion<<"\t开始帧"<<temp.start<<"\t结束帧"<<temp.end<<"\t长度"<<(temp.end-temp.start)*1.0/framePerSecond<<"秒"<<endl;
+										detectedMotion++;
+									}
+								}
+								else
+								{
+									saveObjectCube(temp);
+									maxLength=max(tempLength,maxLength);
+									LOG(INFO)<<"事件"<<detectedMotion<<"\t开始帧"<<temp.start<<"\t结束帧"<<temp.end<<"\t长度"<<(temp.end-temp.start)*1.0/framePerSecond<<"秒"<<endl;
+									detectedMotion++;
+								}
 							}
 							vector<vector<bool>>().swap(temp.objectMask);
 							detectedMotion--;
@@ -544,8 +553,23 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 						else
 						{														//事件正常长度，直接添加到运动序列中
 							maxLength=max(currentLength,maxLength);
-							saveObjectCube(currentObject);
-							LOG(INFO)<<"事件"<<detectedMotion<<"\t开始帧"<<currentObject.start<<"\t结束帧"<<currentObject.end<<"\t长度"<<(currentObject.end-currentObject.start)*1.0/framePerSecond<<"秒"<<endl;
+							/*
+							*  filter the NO ROI 
+							*/
+							if(useROI)
+							{
+								bool test = checkROI(currentObject, roiFilter);
+								if(test)
+								{
+									saveObjectCube(currentObject);
+									LOG(INFO)<<"事件"<<detectedMotion<<"\t开始帧"<<currentObject.start<<"\t结束帧"<<currentObject.end<<"\t长度"<<(currentObject.end-currentObject.start)*1.0/framePerSecond<<"秒"<<endl;
+								}
+							}
+							else
+							{
+								saveObjectCube(currentObject);
+								LOG(INFO)<<"事件"<<detectedMotion<<"\t开始帧"<<currentObject.start<<"\t结束帧"<<currentObject.end<<"\t长度"<<(currentObject.end-currentObject.start)*1.0/framePerSecond<<"秒"<<endl;
+							}	
 						}
 					}
 					vector<vector<bool>>().swap(currentObject.objectMask);
@@ -1227,11 +1251,11 @@ void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<
 			Point mid;
 			mid.x = (p1.x+p2.x)/2;
 			mid.y = (p1.y+p2.y)/2;
-			if(useROI)
-			{
-				mid.x += rectROI.x/scaleSize;
-				mid.y += rectROI.y/scaleSize;
-			}
+			//if(useROI)
+			//{
+			//	mid.x += rectROI.x/scaleSize;
+			//	mid.y += rectROI.y/scaleSize;
+			//}
 			int s1,s2,s3,e1,e2,e3;
 			s1=start/3600;
 			s2=(start%3600)/60;
@@ -1371,6 +1395,57 @@ bool VideoAbstraction::restoreMaskOfFrame(cv::Mat& FrameMask, cv::Mat& eventMask
 	}
 	return true;
 }
+
+/*
+*  根据感兴趣区域生成的过滤窗口判断传入的事件序列是否出现在感兴趣的区域中
+*/
+bool VideoAbstraction::checkROI(ObjectCube& ob, vector<bool>& filter)
+{
+	int size = ob.end-ob.start+1;
+	vector<bool> check(ob.objectMask[0].size(), false);
+	for(int i=0; i<size; i++)
+	{
+		for(int j=0; j<check.size(); j++)
+		{
+			check[j] = check[j] | ob.objectMask[i][j];
+		}
+	}
+	for(int i=0; i<check.size(); i++)
+	{
+		check[i] = check[i] & filter[i];
+	}
+	vector<vector<Point>> contours;	
+	Mat mat = vectorToMat(check, frameHeight, frameWidth);
+	findContours(mat, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+	vector<vector<Point>>::const_iterator itc=contours.begin();
+	//过滤掉过小的闭包，其他闭包全部存放到 newcontors 中
+	while(itc!=contours.end()){
+		if(contourArea(*itc) > objectarea){
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+*  根据之前设置的感兴趣区域来生成用于过滤感兴趣事件的filter
+*/
+void  VideoAbstraction::setFilter(vector<bool>& filter, Rect& rec, int size)
+{
+	filter.clear();
+	for(int i=0; i<size; i++)
+	{
+		filter.push_back(false);
+	}
+	for(int i=rec.y; i<rec.y+rec.height; i++)
+	{
+		for(int j=rec.x; j<rec.x+rec.width; j++)
+		{
+			filter[frameWidth*i+j]=true;
+		}
+	}
+}
+
 
 void VideoAbstraction::writePartToCompound(vector<ObjectCube>& pCompound){}
 

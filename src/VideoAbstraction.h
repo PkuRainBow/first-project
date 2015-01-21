@@ -51,7 +51,7 @@ struct ObjectCube{
 
 class VideoAbstraction{
 public:
-	VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname, int size);
+	VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname, float size);
 	VideoAbstraction();
 	void init();
 	//~VideoAbstraction();
@@ -102,6 +102,7 @@ public:
 	string videoFormat;
 	vector<Mat> compoundResult;
 	vector<Mat> indexs,indexe;
+	vector<bool> roiFilter;
 
 	ObjectCube currentObject;			//外部传进的当前运动帧的信息
 	int detectedMotion;				//检测到的运动序列的个数，每读够 motionToCompound个运动序列，写入一次文件
@@ -196,4 +197,6 @@ public:
 	void writePartToCopy(vector<ObjectCube>& pCopy);
 	void putTextToMat(int start, int end, Mat& mat, vector<vector<Point>>& contours);
 	void computeShift(vector<int>& shift, vector<ObjectCube>& pCompound);
+	bool checkROI(ObjectCube& ob, vector<bool>& filter);
+	void setFilter(vector<bool>& filter, Rect& rec, int size);
 };
