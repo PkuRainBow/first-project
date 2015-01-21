@@ -478,7 +478,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				flag=true;
 			}
-			if(useROI && (double)sum/(rectROI.width*rectROI.height)>thres)
+			if(useROI && (double)sum/((rectROI.width*rectROI.height)/(scaleSize*scaleSize))>thres)
 			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
 				//cout<<"points number : "<<sum<<endl;
 				flag=true;
@@ -658,7 +658,8 @@ void VideoAbstraction::loadObjectCube(int& currentIndex){
 		ob.end=frame_end[j];
 		length=frame_end[j]-frame_start[j]+1;
 		loadIndex+=length;		
-		for(int i=0;i<length;++i)
+
+		for(int i=0;i<length;i++)
 		{
 			vector<vector<Point>>().swap(contors);
 			getline(file, temp, '#');
@@ -672,6 +673,7 @@ void VideoAbstraction::loadObjectCube(int& currentIndex){
 		}
 		vector<vector<Point>>().swap(contors);
 		curMaxLength=max(length,curMaxLength);
+		
 		//view change
 		if(changeSceneNum > 20)
 		{
@@ -936,7 +938,7 @@ void VideoAbstraction::compound(string path){
 	int AverageCount = ObjectCount/motionToCompound;		//每次合成motionToCompound个运动序列的时候，合成的循环的执行次数
 	int RemainCount = ObjectCount%motionToCompound;		//多余出来的运动序列的个数
 
-	cout<<"进入摘要视频合成..."<<endl;
+	LOG(INFO)<<"进入摘要视频合成..."<<endl;
 	clock_t starttime = clock();
 	int currentIndex=0;
 	int compoundSeqNumber=1;
@@ -947,7 +949,7 @@ void VideoAbstraction::compound(string path){
 	*  the main loop to fetch 8 event sequences or <8 videos with view change happened until all the event sequences dealt with ...
 	*/
 	while(currentIndex < EventNum)
-	{			
+	{	
 		int synopsis=motionToCompound;
 		int offset=currentIndex;
 		LOG(INFO)<<"*** 第"<<compoundSeqNumber++<<"次 ***"<<endl;
@@ -990,7 +992,6 @@ void VideoAbstraction::compound(string path){
 		sumLength+=(curMaxLength-startCompound);	
 		for(int j=startCompound;j<curMaxLength;j++)
 		{
-			testcount++;
 			bool haveFrame=false;
 			Mat resultMask, tempMask;
 			Mat indexMat(Size(frameWidth,frameHeight), CV_8U);
@@ -1008,19 +1009,16 @@ void VideoAbstraction::compound(string path){
 			}
 			if(earliestIndex>-1)
 			{
-				//baseIndex=(earliestIndex+ss*motionToCompound)/256;
-				//remainIndex=(earliestIndex+ss*motionToCompound)%256;
 				haveFrame=true;
 				videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[earliestIndex].start-1+j-shift[earliestIndex]);
 				videoCapture>>currentFrame;
 				resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
-				//pyrDown(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 				currentResultFrame=currentFrame.clone();
 				resultMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);
-				//
 				int currentIndex=j-shift[earliestIndex]+1;
 				currentIndex=getObjectIndex(earliestIndex+offset, currentIndex);
-				//saveContorsOfResultFrameToFile(testcount, (earliestIndex+offset), currentIndex);
+				//index Video setting ...
+
 			}
 			if(!haveFrame)
 			{
@@ -1044,9 +1042,10 @@ void VideoAbstraction::compound(string path){
 					//获取偏移后的正确的位移
 					int currentIndex=j-shift[i]+1;
 					currentIndex=getObjectIndex(i+offset, currentIndex);
-					//saveContorsOfResultFrameToFile(testcount, (i+offset), currentIndex);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
+					//index Video setting ...
+
 				}
 			}
 			if(earliestIndex>-1)
@@ -1060,6 +1059,7 @@ void VideoAbstraction::compound(string path){
 			}
 			rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
 				Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize), CV_RGB(0,255,0),2);
+			testcount++;
 			videoWriter.write(currentResultFrame);
 		}
 		//deal with the scene change cases ...
@@ -1079,8 +1079,6 @@ void VideoAbstraction::compound(string path){
 					videoCapture.set(CV_CAP_PROP_POS_FRAMES,j+base_index);
 					videoCapture>>currentResultFrame;
 					resize(currentResultFrame, currentResultFrame, Size(frameWidth, frameHeight));
-					//pyrDown(currentResultFrame, currentResultFrame, Size(frameWidth, frameHeight));
-					//put the time tag info into the readed frame...
 					vector<Point> info;
 					vector<vector<Point>> re_contours;	
 					Mat mat1=vectorToMat(partToCopy[i].objectMask[j],frameHeight,frameWidth);
@@ -1088,6 +1086,7 @@ void VideoAbstraction::compound(string path){
 					putTextToMat(start, end, currentResultFrame, re_contours);
 					rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
 						Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize),CV_RGB(0,255,0),2);
+					testcount++;
 					videoWriter.write(currentResultFrame);
 				}
 			}
@@ -1151,11 +1150,12 @@ void VideoAbstraction::getKeyFrame(string keyframe_path){
 	for(int i=0; i<EventNum; i++)
 	{
 		//read the key frames
-		//frame_index=(frame_start[i]+frame_end[i])/2;
 		frame_index=frame_start[i];
 		loadIndex+=frame_index-frame_start[i]+1;
 		videoread.set(CV_CAP_PROP_POS_FRAMES, frame_index);
 		videoread>>keyframes;
+		//resiz
+		resize(keyframes, keyframes, Size(frameWidth, frameHeight));
 		loadObjectCube(loadIndex, keycontors);
 		MarkContours(keyframes, keycontors);
 		//put the time tag on the frame
@@ -1263,6 +1263,17 @@ void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<
 			e1=end/3600;
 			e2=(end%3600)/60;
 			e3=end%60;
+			//if(useROI)
+			//{
+			//	if(roiFilter[mid.y*frameWidth+mid.x])
+			//	{
+			//		putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
+			//	}
+			//}
+			//else
+			//{
+			//	putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
+			//}
 			putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
 			itc_re++;
 		}
@@ -1437,9 +1448,9 @@ void  VideoAbstraction::setFilter(vector<bool>& filter, Rect& rec, int size)
 	{
 		filter.push_back(false);
 	}
-	for(int i=rec.y; i<rec.y+rec.height; i++)
+	for(int i=(rec.y/scaleSize); i<(rec.y+rec.height)/scaleSize; i++)
 	{
-		for(int j=rec.x; j<rec.x+rec.width; j++)
+		for(int j=(rec.x/scaleSize); j<(rec.x+rec.width)/scaleSize; j++)
 		{
 			filter[frameWidth*i+j]=true;
 		}

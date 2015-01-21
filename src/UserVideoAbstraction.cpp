@@ -65,7 +65,7 @@ void UserVideoAbstraction::UsersetGpu(bool isgpu){
 	userVB->setGpu(isgpu);
 }
 
-void UserVideoAbstraction::UsersetROI(Rect rectroi){	
+void UserVideoAbstraction::UsergetROI(Rect rectroi){	
 	userVB->useROI=true;
 	userVB->rectROI.x=rectroi.x;
 	userVB->rectROI.y=rectroi.y;

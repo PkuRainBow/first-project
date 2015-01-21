@@ -121,7 +121,6 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 				maxCount = event_count[i];
 			}
 		}
-		//ID=ID+baseIndex*256;
 		cout<<"Info:	selected event No. is "<<ID<<endl;	
 		cout<<event_start.size()<<endl;
 		int start=event_start[ID];
@@ -143,6 +142,7 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 	return;  
 }
 
+
 /** test thread **/
 /*****************************************************************/
 //you can set test = 1,2,3,4 for different test
@@ -152,7 +152,6 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 //test=4: you can view 9 snip-shots of the original video 
 /*****************************************************************/
 void testmultithread(string inputpath, string videoname, string midname, string outputname, int frameCount, int CompoundCount, int stage, bool readlog){
-//void testmultithread(const char* inputpath, const char* videoname, const char* midname, const char* outputname, int frameCount, int CompoundCount, int scale, int stage){
 	time_t start_time,end_time;
 	start_time=time(NULL);
 	testVideoName=videoname;
@@ -177,60 +176,53 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	int video_width=capture.get(CV_CAP_PROP_FRAME_WIDTH);
 	int video_height=capture.get(CV_CAP_PROP_FRAME_HEIGHT);
 
+	// resize the resolution of input video ...
 	float scale=1;
 	int basewidth=360;
 	if (video_width>basewidth)
 	{
 		scale=((float)video_width)/basewidth;
 	}
-	//scale=1;
 	LOG(INFO)<<videoname<<" scale = "<<scale<<endl;
+
+	//create the VideoAbstraction Object and intialize the GPU setting and related threshold ...
 	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
 	user->UsersetGpu(false);
-	//user->UsersetIndex(false);
 	user->UsersetSingleMinArea(SINAGLE_MIN_AREA/(scale*scale));
 	user->UsersetMinArea(MIN_AREA_RATE);
 
+	/*
+	*  different choices can excute different step ...
+	*/
 	int test = stage;
+	//record the excution related time information ...
 	ofstream ff(log_path+"TimeLog.txt", ofstream::app);
-	if(test==1){
+	//choice 1:   Background/Foreground Subtraction
+	if(test==1)
+	{
 		state="Background/Foreground Subtraction";
 		VideoCapture capture;
 		string t1=inputpath,t2=videoname;
 		string t3 = t1+t2;
 		capture.open(t3);
+		//record the frame number related information ...
 		ofstream ff(log_path+"FrameLog.txt", ofstream::app);
 		ff<<endl<<videoname<<"\t"<<capture.get(CV_CAP_PROP_FRAME_COUNT);
 		int number=0;
-		//setROI=false;
 		while (capture.read(image))
 		{
+			//choose the roi if setted 
 			if(setROI && number==0){
 				namedWindow("video");
 				imshow("video",image);
 				setMouseCallback("video",mouseSelect);
 				waitKey(0);
 				cvDestroyWindow("video");
-				//user->UsersetROI(selectarea);
+				//record the ROI area related information ...
 				ofstream ff(log_path+"AreaLog.txt", ofstream::app);
 				ff<<endl<<selectarea.x<<":"<<selectarea.y<<":"<<selectarea.width<<":"<<selectarea.height;
-				//float roi_rate=(video_width*video_height)/(selectarea.width*selectarea.height);
-				//LOG(INFO)<<selectarea.width<<" "<<selectarea.height<<endl;
-				//LOG(INFO)<<video_width<<" "<<video_height<<endl;
-				//LOG(INFO)<<roi_rate<<endl;
-				//user->UsersetMinArea(MIN_AREA/(scale*scale*roi_rate));
-				//LOG(INFO)<<"THRES: "<<user->userVB->thres<<endl;
 			}
-			//if(setROI){
-			//	number++;
-			//	image(selectarea).copyTo(imageRoi);
-			//	user->UserAbstraction(imageRoi,number);
-			//}
-			//else{
-			//	number++;
-			//	user->UserAbstraction(image,number);
-			//}
 			number++;
 			user->UserAbstraction(image,number);
 		}
@@ -240,21 +232,19 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		ff<<"\t"<<UsedFrameCount<<"\t"<<(double)UsedFrameCount/(double)capture.get(CV_CAP_PROP_FRAME_COUNT)<<":"<<UsedFrameCount;
 		ff.close();
 	}
+	//choice 2: compound the result video based on the choice 1
 	else if(test==2){
-		//boost::filesystem::remove("F:/TongHaoTest2/Replay");
-		state="compound the result video";
+		state="Compound the result video";
 		string t3 = out_path+outputname;
 		if(setROI){
 			int x,y,width,height;
 			readAreaLog(log_path+"AreaLog.txt", x, y, width, height);
 			Rect selectRoi(x,y,width,height);
-			user->UsersetROI(selectRoi);
-
+			user->UsergetROI(selectRoi);
 			float roi_rate=(video_width*video_height)/(width*height);
 			LOG(INFO)<<video_width<<" "<<video_height<<endl;
 			LOG(INFO)<<width<<" "<<height<<endl;
 			LOG(INFO)<<roi_rate<<endl;
-			//user->UsersetMinArea(MIN_AREA/(scale*scale*roi_rate));
 		}
 		int frCount;
 		if(readlog)
@@ -380,10 +370,10 @@ int main(){
 	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
 		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
 		"Cam3.avi", "Cam4.avi"};
-	string testset2[] = {"三楼办公室.avi", "gaodangxiaoqu.avi", "testvideo.avi", "金融.avi","食堂1.avi", "20110915_14-17-35.avi",
-		   "20111202_082711.avi","20111202_101331.avi", "食堂2.avi", "食堂3.avi", "食堂4.avi", "食堂5.avi", "食堂6.avi", "食堂7.avi", "卡口 .avi"};
+	string testset2[] = {"shitang5.avi", "shitang3.avi", "shitang2.avi", "shitang6.avi", "shitang7.avi","gaodangxiaoqu.avi","testvideo.avi", "jinrong.avi","shitang1.avi",
+		"三楼办公室.avi",  "20110915_14-17-35.avi",  "20111202_082711.avi","20111202_101331.avi",  "卡口 .avi"};
 
-	int testno=1,choice;
+	int testno=3,choice;
 	string result_name="original_result_"+testset2[testno];
 	cout<<result_name<<endl;
 	string config_name="config";
@@ -392,12 +382,10 @@ int main(){
 		result_name="ROI"+result_name;
 		config_name="ROI"+config_name;
 	}
-	//cout<<"input your choice: ";
-	//cin>>choice;
-	//boost::thread test1(testmultithread,"F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, choice, true);
-	testmultithread("F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, 1, true);
-	testmultithread("F:/TongHaoTest2/", testset2[testno], config_name, result_name, 0, 8, 2, true);
-	cout<<"finished..."<<endl;
+	for(int i=10; i<testset2->size(); i++){
+		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
+		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 2, true);
+	}
 
 	//for(int i=2; i<3; i++){	
 	//	string result_name="result_"+testset2[i]+"cpu";
@@ -441,7 +429,6 @@ int readFrameLog(string logname){
 		getline(fin,lastLine);                      // Read the current line
 		cout<< lastLine<<'\n';     // Display it
 		//lastLine
-		
 	    string token = lastLine.substr(lastLine.find(":")+1, lastLine.size());
 		return atoi(token.c_str());
 		fin.close();
