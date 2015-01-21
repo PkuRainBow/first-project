@@ -598,7 +598,7 @@ void VideoAbstraction::saveObjectCube(ObjectCube &ob){			//保存运动的凸包
 		Mat tmp=vectorToMat(ob.objectMask[j],frameHeight,frameWidth);
 		vector<vector<Point>> contors;
 		findContours(tmp,contors,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE); //提取凸包信息
-		ff<<contorsToString(contors);
+		ff<<util::contorsToString(contors);
 		ff<<'#';	
 		ObjectCubeNumber++;
 	}
@@ -624,7 +624,7 @@ string VideoAbstraction::loadObjectCube(int bias, vector<vector<Point>>& contour
 	{
 		getline(file, temp, '#');
 	}
-	contours = stringToContors(temp);
+	contours = util::stringToContors(temp);
 	return temp;
 }
 
@@ -663,7 +663,7 @@ void VideoAbstraction::loadObjectCube(int& currentIndex){
 		{
 			vector<vector<Point>>().swap(contors);
 			getline(file, temp, '#');
-			contors=stringToContors(temp);
+			contors=util::stringToContors(temp);
 			Mat bb(frameHeight,frameWidth,CV_8U,Scalar::all(0));
 			drawContours(bb,contors,-1,Scalar(255),-1);
 			//check whether the view is changed
@@ -716,7 +716,7 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 		{
 			vector<vector<Point>>().swap(contors);
 			getline(file, temp, '#');
-			contors=stringToContors(temp);
+			contors=util::stringToContors(temp);
 			Mat bb(frameHeight,frameWidth,CV_8U,Scalar::all(0));
 			drawContours(bb,contors,-1,Scalar(255),-1);
 			//check whether the view is changed
@@ -790,57 +790,6 @@ void  VideoAbstraction::LoadConfigInfo(int frameCountUsed){  //用于分阶段�
 		EventNum++;
 	}
 	file.close();
-}
-
-string VideoAbstraction::contorsToString(vector<vector<Point>> &contors){
-	string re="";
-	re+=boost::lexical_cast<string>(contors.size());
-	re+="\t";
-	for(int i=0;i<contors.size();++i)
-	{
-		re+=boost::lexical_cast<string>(contors[i].size());
-		re+="\t";
-		for(int j=0;j<contors[i].size();j++)
-		{
-			re+=boost::lexical_cast<string>(contors[i][j].x);
-			re+="\t";
-			re+=boost::lexical_cast<string>(contors[i][j].y);
-			re+="\t";
-		}
-	}
-	re+="\n";
-	return re;
-}
-
-vector<vector<Point>> VideoAbstraction::stringToContors(string ss){
-	vector<vector<Point>> contors;
-	int s=0,e=0;
-	e=ss.find("\t",s);
-	string tmp=ss.substr(s,e-s);
-	s=e+1;
-	int n=boost::lexical_cast<int>(tmp),x,y;
-	for(int i=0;i<n;i++)
-	{
-		vector<Point> cur;
-		e=ss.find("\t",s);
-		tmp=ss.substr(s,e-s);
-		s=e+1;
-		int nn=boost::lexical_cast<int>(tmp);
-		for(int j=0;j<nn;j++)
-		{
-			e=ss.find("\t",s);
-			tmp=ss.substr(s,e-s);
-			s=e+1;
-			x=boost::lexical_cast<int>(tmp);
-			e=ss.find("\t",s);
-			tmp=ss.substr(s,e-s);
-			s=e+1;
-			y=boost::lexical_cast<int>(tmp);
-			cur.push_back(Point(x,y));
-		}
-		contors.push_back(cur);
-	}
-	return contors;
 }
 
 
@@ -921,6 +870,7 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 * 视频合成阶段 参数： 包含有结果文件名字的完整路径 eg. compound("F:/input/Test.avi")
 */
 void VideoAbstraction::compound(string path){	
+	indexReplay replay(Inputpath+"Replay/"+InputName, Inputpath+"Config/"+MidName);
 	int testcount=-1;
 	Outpath=path;	
 	cout<<Outpath<<endl;
@@ -992,6 +942,7 @@ void VideoAbstraction::compound(string path){
 		sumLength+=(curMaxLength-startCompound);	
 		for(int j=startCompound;j<curMaxLength;j++)
 		{
+			testcount++;
 			bool haveFrame=false;
 			Mat resultMask, tempMask;
 			Mat indexMat(Size(frameWidth,frameHeight), CV_8U);
@@ -1018,6 +969,7 @@ void VideoAbstraction::compound(string path){
 				int currentIndex=j-shift[earliestIndex]+1;
 				currentIndex=getObjectIndex(earliestIndex+offset, currentIndex);
 				//index Video setting ...
+				replay.saveEventsParamOfFrameToFile(testcount, earliestIndex+offset, currentIndex);
 
 			}
 			if(!haveFrame)
@@ -1042,10 +994,10 @@ void VideoAbstraction::compound(string path){
 					//获取偏移后的正确的位移
 					int currentIndex=j-shift[i]+1;
 					currentIndex=getObjectIndex(i+offset, currentIndex);
+					//index Video setting ...
+					replay.saveEventsParamOfFrameToFile(testcount, (i+offset), currentIndex);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
-					//index Video setting ...
-
 				}
 			}
 			if(earliestIndex>-1)
@@ -1059,7 +1011,6 @@ void VideoAbstraction::compound(string path){
 			}
 			rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
 				Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize), CV_RGB(0,255,0),2);
-			testcount++;
 			videoWriter.write(currentResultFrame);
 		}
 		//deal with the scene change cases ...
@@ -1139,7 +1090,7 @@ void VideoAbstraction::writeMask(Mat& input, Mat& output, int index){
 * 获取所有的关键帧及每个关键事件中的一帧信息保存成图片到路径 /KeyFrames/inputname/*
 */
 void VideoAbstraction::getKeyFrame(string keyframe_path){
-	create_path(keyframe_path);
+	util::create_path(keyframe_path);
 	VideoCapture videoread;
 	videoread.open(Inputpath+InputName);
 	Mat keyframes;
@@ -1208,25 +1159,12 @@ void VideoAbstraction::MarkContours(Mat& mat, vector<vector<Point>>& contours){
 }
 
 /*
-* 创建传进来的路径/如果存在则不会创建
-*/
-void VideoAbstraction::create_path(string path){
-	fstream testfile;
-	testfile.open(path, ios::in);
-	if(!testfile)
-	{
-		boost::filesystem::path dir(path);
-		boost::filesystem::create_directories(dir);
-	}
-}
-
-/*
 * 参数：指定的事件序号 事件中的偏移量   返回值： 中间config文件中的偏移量（所有运动序列中的偏移量）
 */
 int VideoAbstraction::getObjectIndex(int number, int bias){
 	int result=0;
 	for(int i=0; i<number; i++){
-		result+=frame_end[i]-frame_start[i];
+		result+=(frame_end[i]-frame_start[i]+1);
 	}
 	result+=bias;
 	return result;
@@ -1316,95 +1254,6 @@ void VideoAbstraction::computeShift(vector<int>& shift, vector<ObjectCube>& pCom
 	shift=tmpshift;
 	LOG(INFO)<<"最小损失"<<min<<endl;
 	LOG(INFO)<<"时间偏移计算耗时"<<clock()-starttime<<"豪秒\n";
-}
-
-/*
-* 事件索引回放功能实现
-*/
-std::string VideoAbstraction::getTempFilePath(int frame_num){
-	std::string fileName;
-	create_path(Inputpath+"Replay/"+InputName+"/");
-	string filepath=Inputpath+"Replay/"+InputName+"/";
-	char num[10];
-	fileName = filepath + itoa(frame_num, num, 10) + ".txt";
-	return fileName;
-}
-
-bool VideoAbstraction::saveContorsOfResultFrameToFile(int frame_Num, int indexOfMask, int bias){
-	//cout<<"frameNum "<<frame_Num<<"   index of mask" << indexOfMask << endl;
-	std::string fileName = getTempFilePath(frame_Num);
-	std::ofstream outfile(fileName, ios::app);
-	vector<vector<Point>> contours;
-	//change the way to Get contours ...
-	outfile << indexOfMask << " " << loadObjectCube(bias, contours) << std::endl;
-	outfile.close();
-	return true;
-}
-
-cv::Mat VideoAbstraction::loadContorsOfResultFrameFromFile(int frame_Num, int width, int height, vector<int>& lookupTable){
-	lookupTable.clear();
-	lookupTable.push_back(-1);
-
-	cv::Mat resultMask(width, height, CV_8UC1, Scalar::all(0));
-	std::string fileName = getTempFilePath(frame_Num);
-	std::ifstream infile(fileName);
-
-	std::string line;
-	cv::Mat mask(width, height, CV_8UC1, Scalar::all(0));
-
-	while (std::getline(infile, line)) 
-	{
-		if (!line.size())
-			continue;
-		std::stringstream ss(line);
-		std::string sContors;
-		int indexOfMask = -1;
-		ss >> indexOfMask;//每行第一个数值为事件标号，后面为Contors定点坐标
-		//cout << indexOfMask << " " << lookupTable. << " size "<<lookupTable.size();
-		if (indexOfMask != lookupTable[lookupTable.size() - 1]){
-			lookupTable.push_back(indexOfMask);
-		}
-		std::getline(ss, sContors);
-		sContors = sContors.substr(1);
-		std::vector<std::vector<cv::Point> >contours = stringToContors(sContors);	
-		cv::drawContours(mask, contours, -1, Scalar(255), -1);
-		restoreMaskOfFrame(resultMask, mask, lookupTable.size() - 1);
-		mask = cv::Mat::zeros(width, height, CV_8UC1);
-	}
-	infile.close();
-	
-	return resultMask;
-}
-
-bool VideoAbstraction::restoreMaskOfFrame(cv::Mat& FrameMask, cv::Mat& eventMask, int index){
-	/*imshow("eventMask", eventMask);
-	waitKey(0);*/
-	int nc = FrameMask.cols;
-	int nl = FrameMask.rows;
-	if (eventMask.cols != nc || eventMask.rows != nl){
-		return false;
-	}
-	if (FrameMask.isContinuous() && eventMask.isContinuous())
-	{
-		nc = nc * nl;
-		nl = 1;
-	}
-	for (int j = 0; j < nl; ++j)
-	{
-		uchar* c_data = eventMask.ptr<uchar>(j);
-		uchar* m_data = FrameMask.ptr<uchar>(j);
-		for (int i = 0; i < nc; ++i)
-		{
-			if (*c_data++ != 0)
-			{
-				//*m_data++ = index;
-				*m_data++ = index;
-			} else {
-				m_data++;
-			}
-		}
-	}
-	return true;
 }
 
 /*

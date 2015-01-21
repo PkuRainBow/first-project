@@ -8,6 +8,8 @@
 
 #include "VideoAbstraction.h"
 #include "UserVideoAbstraction.h"
+#include "indexReplay.h"
+#include "util.h"
 #include <time.h>
 
 
@@ -20,7 +22,6 @@ extern int readFrameLog(string logname);
 extern void readAreaLog(string logname, int &base_x, int &base_y, int& base_w, int& base_h);
 extern Mat MultiImage(const vector<Mat>& SrcImg_V, Size ImgMax_Size);
 extern void video_play(long index);
-extern void create_path(string path);
 extern string int2string(int _Val);
 static void bar_callback(int index,void* userdata);
 
@@ -41,8 +42,8 @@ int small_height;//每个小图的高度
 //setROI=false by default 
 Rect selectarea;
 bool select_flag=false;
-bool setROI=true;
-Mat image,imageRoi,showimage,index_image;
+bool setROI=false;
+Mat image,imageRoi,showimage;
 //Video Index
 int currentFrameIndex=0;
 int frame_weidth;
@@ -53,8 +54,6 @@ vector<int> event_start;
 vector<int> event_end;
 vector<int> event_length;
 int event_count[MAX_INDEX_COUNT];
-
-vector<int> loopuptable;
 
 /* calling back event function */
 //ROI selection
@@ -83,6 +82,7 @@ void mouseSelect(int mouseEvent,int x,int y,int flags,void* param)
 //Replay the seleted object's video shot
 void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 {
+	replayParams* replay_params = (replayParams*)param;
 	Point p1,p2;
 	if(mouseEvent==CV_EVENT_LBUTTONDOWN){
 		select_flag=true;
@@ -98,6 +98,10 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 		imshow("video",showimage);
 	}
 	else if(select_flag && mouseEvent==CV_EVENT_LBUTTONUP){
+		std::vector<int> loopuptable;
+		indexReplay replay(replay_params->replayFileName, replay_params->replayConfigName);
+		cv::Mat index_image = replay.loadEventsParamToRebuildMask(currentFrameIndex, replay_params->video_width, replay_params->video_height, loopuptable);
+		//
 		select_flag=false;
 		int ID=0, maxCount=0,baseIndex=0;
 		uchar *p;
@@ -111,7 +115,15 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 		for(int i=0; i<destmat.rows; i++){
 			p=destmat.ptr<uchar>(i);
 			for(int j=0; j<destmat.cols; j++){
-				event_count[loopuptable[(int)p[j]]]++;
+				if ((int)p[j] != 255)//255为mask背景
+				{
+					if ((int)p[j] >= loopuptable.size())
+					{
+						cout << "error, p[j] out of boundary : p[j] = " << (int)p[j] << endl;
+						return;
+					}
+					event_count[loopuptable[(int)p[j]]]++;
+				}
 			}
 		}
 
@@ -121,11 +133,11 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 				maxCount = event_count[i];
 			}
 		}
-		cout<<"Info:	selected event No. is "<<ID<<endl;	
+		LOG(INFO)<<"selected event No. is "<<ID<<endl;	
 		cout<<event_start.size()<<endl;
 		int start=event_start[ID];
 		int end=event_end[ID];
-		cout<<"Info:	frame index start from  "<<start<<"	to	"<<end<<endl;
+		LOG(INFO)<<"Info:	frame index start from  "<<start<<"	to	"<<end<<endl;
 		//replay the selected video
 		VideoCapture vc_read;
 		Mat cur_mat;
@@ -160,14 +172,16 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	string out_path=path+"OutputVideo/";
 	string config_path=path+"Config/";
 	string index_path=path+"indexMat/";
+	string replay_path=path+"Replay/";
 	string keyframe_path=path+"KeyFrame/";
 	log_path=path+"Log/";
 	//create the path if not exist
-	create_path(out_path);
-	create_path(log_path);
-	create_path(config_path);
-	create_path(index_path);
-	create_path(keyframe_path);
+	util::create_path(out_path);
+	util::create_path(log_path);
+	util::create_path(config_path);
+	util::create_path(index_path);
+	util::create_path(keyframe_path);
+	util::create_path(replay_path);
 
 	VideoCapture capture;
 	string t1=inputpath,t2=videoname;
@@ -229,35 +243,43 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		int UsedFrameCount = user->UsersaveConfigInfo();
 		frameCount=UsedFrameCount;
 		user->~UserVideoAbstraction();
+		//record the used frame count information ...
 		ff<<"\t"<<UsedFrameCount<<"\t"<<(double)UsedFrameCount/(double)capture.get(CV_CAP_PROP_FRAME_COUNT)<<":"<<UsedFrameCount;
 		ff.close();
 	}
+
 	//choice 2: compound the result video based on the choice 1
-	else if(test==2){
+	else if(test==2)
+	{
 		state="Compound the result video";
 		string t3 = out_path+outputname;
 		if(setROI){
 			int x,y,width,height;
+			//get the ROI information recorded in the AreaLog.txt ...
 			readAreaLog(log_path+"AreaLog.txt", x, y, width, height);
 			Rect selectRoi(x,y,width,height);
+			//Set the ROI information and create the filter 0/1 mat ...
 			user->UsergetROI(selectRoi);
+			//print the ROI / Original video rate information ...
 			float roi_rate=(video_width*video_height)/(width*height);
 			LOG(INFO)<<video_width<<" "<<video_height<<endl;
 			LOG(INFO)<<width<<" "<<height<<endl;
 			LOG(INFO)<<roi_rate<<endl;
 		}
 		int frCount;
+		//get the frameCount info from the FrameLog.txt ...
 		if(readlog)
 			frCount=readFrameLog(log_path+"FrameLog.txt");
 		else
 			frCount=frameCount;
-		//int frCount = readFrameLog(log_path+"FrameLog.txt");
-		cout<<frCount<<endl;
-		//int frCount=frameCount;
+		//excute the compound step to compound the final output video ...
 		user->Usercompound(CompoundCount, (char*)t3.data(), frCount);
 		user->UserfreeObject();
 	}
-	else if(test==3){
+
+	//choice 3: Test the replay function ...
+	else if(test==3)
+	{
 		state="test the index video function";
 		int frCount;
 		if(readlog)
@@ -269,7 +291,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		string t3 = outputname;
 		t3=out_path+t3;
 		string temp;
-		//读取中间文件获取 event_start event_end event_length 信息
+		//read the neccerary information from Log info ...
 		ifstream file(config_path+t2);
 		cout<<t2<<endl;
 		cout<<frCount<<endl;
@@ -290,36 +312,33 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 			EventNumber++;
 		}
 		file.close();
-		//index
+		//open the result video ...
 		VideoCapture abstract_video;
 		abstract_video.open(t3);
 		currentFrameIndex=0;
 		string filepath=index_path+t+"/";
 		namedWindow("video");
-		//setMouseCallback("video",mouseRecover);
 
+		replayParams* replay_params = new replayParams(replay_path+videoname, config_path+midname, video_width / scale, video_height / scale);
+		setMouseCallback("video",mouseRecover, (void*)replay_params);
 		abstract_video.read(image);
 		imshow("video",image);
 		waitKey(0);
 		abstract_video.open(t3);
-		while(abstract_video.read(image)){
-			currentFrameIndex++;	
-			//string filename=boost::lexical_cast<string>(currentFrameIndex)+".bmp";
-			//index_image=imread(filepath+filename);
+		while(abstract_video.read(image)){		
 			imshow("video",image);
-			index_image = user->userVB->loadContorsOfResultFrameFromFile(currentFrameIndex, image.rows, image.cols, loopuptable);
-			//Mat temp = user->userVB->loadContorsOfResultFrameFromFile(currentFrameIndex, image.rows, image.cols, loopuptable);
-			//imshow("temp", temp);
-			//waitKey(30);
-			//imshow("index", index_image);
-			setMouseCallback("video",mouseRecover);
 			int key = waitKey(30); 
 			if(key==27)
+			{
 				waitKey(0);
+			}	
+			currentFrameIndex++;	
 		}
 	}
-
-	else if(test==4){
+	
+	//Test the getting key frames function ...
+	else if(test==4)
+	{
 		string t1=inputpath,t2=midname,t3=videoname,temp;
 		int frCount;
 		if(readlog)
@@ -328,15 +347,19 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 			frCount=frameCount;
 		user->UserGetKeyFrame(keyframe_path+t3+"/",frCount);
 	}
-	else{
+
+	//others ...
+	else
+	{
 		//check or debug 
 	}
+
 	end_time=time(NULL);
+	//output the time information to the cmd and timeLog Information ...
 	cout<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<" s"<<endl;
 	ff<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<endl;
 	ff.close();
 }
-
 
 int main(){
 	//cout<<"***********************************************************************************"<<endl;
@@ -370,21 +393,22 @@ int main(){
 	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
 		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
 		"Cam3.avi", "Cam4.avi"};
-	string testset2[] = {"shitang5.avi", "shitang3.avi", "shitang2.avi", "shitang6.avi", "shitang7.avi","gaodangxiaoqu.avi","testvideo.avi", "jinrong.avi","shitang1.avi",
+	string testset2[] = {"gaodangxiaoqu.avi","shitang5.avi", "shitang3.avi", "shitang2.avi", "shitang6.avi", "shitang7.avi","testvideo.avi", "jinrong.avi","shitang1.avi",
 		"三楼办公室.avi",  "20110915_14-17-35.avi",  "20111202_082711.avi","20111202_101331.avi",  "卡口 .avi"};
 
-	int testno=3,choice;
-	string result_name="original_result_"+testset2[testno];
-	cout<<result_name<<endl;
-	string config_name="config";
-	if(setROI)
-	{
-		result_name="ROI"+result_name;
-		config_name="ROI"+config_name;
-	}
-	for(int i=10; i<testset2->size(); i++){
+
+	//for(int i=0; i<testset2->size(); i++){
+	for(int i=0; i<1; i++){
+		string result_name="result_"+testset2[i];
+		string config_name=testset2[i]+"_config";
+		if(setROI)
+		{
+			result_name="ROI"+result_name;
+			config_name="ROI"+config_name;
+		}
 		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
 		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 2, true);
+		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 3, true);
 	}
 
 	//for(int i=2; i<3; i++){	
@@ -466,15 +490,6 @@ void readAreaLog(string logname, int &base_x, int &base_y, int& base_w, int& bas
 		base_w = boost::lexical_cast<int>(elem[2]);
 		base_h = boost::lexical_cast<int>(elem[3]);
 		fin.close();
-	}
-}
-
-void create_path(string path){
-	fstream testfile;
-	testfile.open(path, ios::in);
-	if(!testfile){
-		boost::filesystem::path dir(path);
-		boost::filesystem::create_directories(dir);
 	}
 }
 

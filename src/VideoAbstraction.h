@@ -5,7 +5,8 @@
 //Discription: declare the necessary variable and interface
 //Update:      2015/01/17
 //****************************************
-
+#include "indexReplay.h"
+#include "util.h"
 #include <opencv2\opencv.hpp>
 #include <iostream>
 #include <string>
@@ -131,8 +132,6 @@ public:
 	Mat currentMask;	
 
 	string int2string(int _Val);
-	vector<vector<Point>> stringToContors(string ss);										//将字符串-->凸包信息
-	string contorsToString(vector<vector<Point>> &contors);
 	void setVideoFormat(string Format);
 	void postProc(Mat& frame);															//对得到的帧图像进行后处理(去噪 连通区域处理 凸包计算 膨胀腐蚀)							
 	void ConnectedComponents(int frameindex, Mat &mask,int thres);										//凸包计算---连通区域计算算法的实现
@@ -171,7 +170,6 @@ public:
 	void setROI(bool isroi);
 	void writeMask(Mat& input, Mat& output, int index);
 	void getKeyFrame(string keyframe_path);
-	void create_path(string path);
 	void MarkContours(Mat& mat, vector<vector<Point>>& keycontours);
 
 	//文件存取格式：
