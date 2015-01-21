@@ -4,8 +4,6 @@
 * 事件索引回放功能实现
 */
 
-
-
 bool indexReplay::saveEventsParamOfFrameToFile(int frame_Num, int indexOfevent, int bias) {
 	//cout<<"frameNum "<<frame_Num<<"   index of mask" << indexOfMask << endl;
 

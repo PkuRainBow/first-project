@@ -88,6 +88,35 @@ void VideoAbstraction::postProc(Mat& frame){
 	dilate(frame,frame,Mat());// 用于膨胀图像 参数列表：(输入图像，目标图像，用于膨胀的结构元素---若为null-则使用3*3的结构元素，膨胀的次数)
 }
 
+
+void xincoder_ConnectedComponents(int frameindex, Mat &mask,int thres){  
+	Mat ele(2,4,CV_8U,Scalar(1));
+	erode(mask,mask,ele);// 默认时，ele 为 cv::Mat() 形式  参数扩展（image， eroded, structure, cv::Point(-1,-1,), 3） 
+	//右侧2个参数分别表示 是从矩阵的中间开始，3表示执行3次同样的腐蚀操作
+	dilate(mask,mask,ele);
+	vector<vector<Point>> contors,newcontors;
+	vector<Point> hull;
+	findContours(mask,contors,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE); //找到所有的contour 闭包
+	vector<vector<Point>>::const_iterator itc=contors.begin();
+	//过滤掉过小的闭包，其他闭包全部存放到 newcontors 中
+	while(itc!=contors.end()){
+		if(contourArea(*itc)<thres){
+			//if(itc->size()<thres){
+			itc=contors.erase(itc);
+		}
+		else{
+			convexHull(*itc,hull);
+			newcontors.push_back(hull);
+			itc++;
+		}
+	}
+	mask=0;
+	drawContours(mask,newcontors,-1,Scalar(255),-1); // Scalar(255) 表示对应的背景是全部黑色
+
+	vector<vector<Point>>().swap(contors);
+	vector<vector<Point>>().swap(newcontors);
+}
+
 void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){  
 	Mat ele(2,4,CV_8U,Scalar(1));
 	erode(mask,mask,ele);// 默认时，ele 为 cv::Mat() 形式  参数扩展（image， eroded, structure, cv::Point(-1,-1,), 3） 
@@ -111,6 +140,9 @@ void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){
 	}
 	mask=0;
 	drawContours(mask,newcontors,-1,Scalar(255),-1); // Scalar(255) 表示对应的背景是全部黑色
+	//xincoder
+	dilate(mask,mask,cv::Mat());
+	//xincoder
 	vector<vector<Point>>().swap(contors);
 	vector<vector<Point>>().swap(newcontors);
 }
@@ -450,6 +482,10 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			mog(gFrame,gForegroundMask,LEARNING_RATE);	//更新背景模型并且返回前景信息   参数解释： （下一个视频帧， 输出的前景帧信息， 学习速率）
 			mog.getBackgroundImage(gBackgroundImg);		//输出的背景信息存储在 gBackgroundImg
 			gBackgroundImg.copyTo(backgroundImage);		//保存背景图片到 backgroundImage 中
+			//xincoder_start
+			erode(gForegroundMask,gForegroundMask,cv::Mat());
+			dilate(gForegroundMask,gForegroundMask,cv::Mat());
+			//xincoder_end
 		}
 		imwrite(InputName+"background.jpg",backgroundImage);
 	}
@@ -464,11 +500,19 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 				gpuFrame.upload(currentFrame);
 				gpumog(gpuFrame,gpuForegroundMask,LEARNING_RATE);
 				gpuForegroundMask.download(currentMask);
+
+				//xincoder_start
+				xincoder_ConnectedComponents(frameIndex,currentMask,10);
+				//xincoder_end
 			}
 			else
 			{
 				currentFrame.copyTo(gFrame);
 				mog(gFrame,gForegroundMask,LEARNING_RATE);
+				//xincoder
+				erode(gForegroundMask,gForegroundMask,cv::Mat());
+				dilate(gForegroundMask,gForegroundMask,cv::Mat());
+				//xincoder
 				gForegroundMask.copyTo(currentMask);		//复制运动的凸包序列到 currentMask 中
 			}
 			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
@@ -901,6 +945,7 @@ void VideoAbstraction::compound(string path){
 	while(currentIndex < EventNum)
 	{	
 		int synopsis=motionToCompound;
+		//bug
 		int offset=currentIndex;
 		LOG(INFO)<<"*** 第"<<compoundSeqNumber++<<"次 ***"<<endl;
 		/*
@@ -966,11 +1011,10 @@ void VideoAbstraction::compound(string path){
 				resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 				currentResultFrame=currentFrame.clone();
 				resultMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);
-				int currentIndex=j-shift[earliestIndex]+1;
-				currentIndex=getObjectIndex(earliestIndex+offset, currentIndex);
+				int offIndex=j-shift[earliestIndex]+1;
+				int resultindex=getObjectIndex(earliestIndex+offset, offIndex);
 				//index Video setting ...
-				replay.saveEventsParamOfFrameToFile(testcount, earliestIndex+offset, currentIndex);
-
+				replay.saveEventsParamOfFrameToFile(testcount, earliestIndex+offset, resultindex);
 			}
 			if(!haveFrame)
 			{
@@ -992,10 +1036,10 @@ void VideoAbstraction::compound(string path){
 					resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 					currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
 					//获取偏移后的正确的位移
-					int currentIndex=j-shift[i]+1;
-					currentIndex=getObjectIndex(i+offset, currentIndex);
+					int offIndex=j-shift[i]+1;
+					int resultindex=getObjectIndex(i+offset, offIndex);
 					//index Video setting ...
-					replay.saveEventsParamOfFrameToFile(testcount, (i+offset), currentIndex);
+					replay.saveEventsParamOfFrameToFile(testcount, (i+offset), resultindex);
 					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
 				}
@@ -1035,6 +1079,10 @@ void VideoAbstraction::compound(string path){
 					Mat mat1=vectorToMat(partToCopy[i].objectMask[j],frameHeight,frameWidth);
 					findContours(mat1,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
 					putTextToMat(start, end, currentResultFrame, re_contours);
+					//
+					int resultindex=getObjectIndex(i+offset+partToCompoundNum, j);
+					replay.saveEventsParamOfFrameToFile(testcount, (i+offset+partToCompoundNum), resultindex);
+					//
 					rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
 						Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize),CV_RGB(0,255,0),2);
 					testcount++;
@@ -1183,17 +1231,32 @@ void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<
 		}
 		else
 		{
-			convexHull(*itc_re,info);
-			Point p1 = info.at(1);
-			Point p2 = info.at(info.size()/2);
+			//xincoder_start
+			int min_x=999999;
+			int max_x=0;
+			int min_y=999999;
+			for (int xx=0;xx<itc_re->size();xx++)
+			{
+				int x=(*itc_re)[xx].x;
+				int y=(*itc_re)[xx].y;
+				if (max_x<x)
+				{
+					max_x=x;
+				}
+				if (min_x>x)
+				{
+					min_x=x;
+				}
+				if (min_y>y)
+				{
+					min_y=y;
+				}
+			}
 			Point mid;
-			mid.x = (p1.x+p2.x)/2;
-			mid.y = (p1.y+p2.y)/2;
-			//if(useROI)
-			//{
-			//	mid.x += rectROI.x/scaleSize;
-			//	mid.y += rectROI.y/scaleSize;
-			//}
+			mid.x=(min_x+max_x)/2;
+			mid.y=min_y;
+			//xincoder_end
+
 			int s1,s2,s3,e1,e2,e3;
 			s1=start/3600;
 			s2=(start%3600)/60;

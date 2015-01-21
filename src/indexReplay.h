@@ -5,7 +5,6 @@
 #include <string>
 #include "util.h"
 
-
 struct replayParams{
 	std::string replayFileName;
 	std::string replayConfigName;
@@ -14,7 +13,6 @@ struct replayParams{
 	replayParams(std::string _replayFileName, std::string _replayConfigName, int _video_width, int _video_height):replayFileName(_replayFileName), replayConfigName(_replayConfigName), video_width(_video_width), video_height(_video_height){}
 	~replayParams(){}
 };
-
 
 class indexReplay
 {

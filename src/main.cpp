@@ -13,8 +13,8 @@
 #include <time.h>
 
 
-#define MAX_INDEX_COUNT 1000
-#define SINAGLE_MIN_AREA 200
+#define MAX_INDEX_COUNT 100
+#define SINAGLE_MIN_AREA 200 // set the minimal single object area thres
 #define MIN_AREA_RATE 0.001
 
 //declaration
@@ -29,15 +29,6 @@ static void bar_callback(int index,void* userdata);
 string testVideoName;
 string log_path;
 string state;
-//snap-shot 
-VideoCapture capture;
-Size SubPlot;
-char* window_name="img";
-char* window_play="video";
-int bar_index;//指示视频播放进度条
-vector<long> video_index;//用于记录每个快照对应视频帧数
-int small_width;//每一个小图的宽度
-int small_height;//每个小图的高度
 //ROI-set 
 //setROI=false by default 
 Rect selectarea;
