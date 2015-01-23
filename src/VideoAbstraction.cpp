@@ -552,7 +552,8 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 						{								//运动序列的长度太长，是无意义的运动序列，直接丢弃
 							detectedMotion--;
 						} 
-						else if(currentLength>maxLengthToSpilt*2)
+						//change split number ...
+						else if(currentLength>maxLengthToSpilt*8)
 						{							//事件过长 进行切分处理
 							LOG(INFO)<<"事件过长:"<<currentLength<<endl;
 							int spilt=currentLength/maxLengthToSpilt+1;
@@ -1056,6 +1057,9 @@ void VideoAbstraction::compound(string path){
 			rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
 				Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize), CV_RGB(0,255,0),2);
 			videoWriter.write(currentResultFrame);
+			//
+			//imshow("compound",currentResultFrame);
+			//waitKey(1);
 		}
 		//deal with the scene change cases ...
 		if(partToCopyNum>0)
@@ -1087,6 +1091,9 @@ void VideoAbstraction::compound(string path){
 						Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize),CV_RGB(0,255,0),2);
 					testcount++;
 					videoWriter.write(currentResultFrame);
+					//
+					//imshow("compound",currentResultFrame);
+					//waitKey(1);
 				}
 			}
 		}
@@ -1264,18 +1271,18 @@ void VideoAbstraction::putTextToMat(int start, int end, Mat& mat, vector<vector<
 			e1=end/3600;
 			e2=(end%3600)/60;
 			e3=end%60;
-			//if(useROI)
-			//{
-			//	if(roiFilter[mid.y*frameWidth+mid.x])
-			//	{
-			//		putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
-			//	}
-			//}
-			//else
-			//{
-			//	putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
-			//}
-			putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
+			if(useROI)
+			{
+				if(roiFilter[mid.y*frameWidth+mid.x])
+				{
+					putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
+				}
+			}
+			else
+			{
+				putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
+			}
+			//putText(mat,int2string(s1)+":"+int2string(s2)+":"+int2string(s3)+"-"+int2string(e1)+":"+int2string(e2)+":"+int2string(e3),mid,CV_FONT_HERSHEY_COMPLEX,0.4, Scalar(0,255,0),1);
 			itc_re++;
 		}
 	}

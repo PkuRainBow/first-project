@@ -99,6 +99,7 @@ public:
 	vector<int> frame_start;			//记录所有运动序列的开始帧序号/结束帧序号
 	vector<int> frame_end;
 	int loadIndex;					//load凸包运动信息的偏移参数
+	//int currentIndex;                 //记录当前事件的序列数
 
 	string videoFormat;
 	vector<Mat> compoundResult;
