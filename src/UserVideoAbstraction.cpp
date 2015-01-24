@@ -91,3 +91,6 @@ void UserVideoAbstraction::UserGetKeyFrame(string filepath, int frameCount){
 	userVB->getKeyFrame(filepath);
 }
 
+void UserVideoAbstraction::UsersetTimeTag(bool timetag){
+	userVB->useTimeFlag=timetag;
+}

@@ -133,6 +133,7 @@ public:
 	bool useGpu;
 	bool useROI;
 	bool useIndex;
+	bool useTimeFlag;
 	Rect rectROI;
 
 	BackgroundSubtractorMOG2 mog;
@@ -212,7 +213,7 @@ public:
 	//split The loading object process & The stitching process
 	void postCompound(int& testcount, int offset, indexReplay& replay);
 
-	//thread
+	//thread to boost the process of dealing with the config file to compound the final video ...
 	void thread_load();
 	void thread_compound();
 };

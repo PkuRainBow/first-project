@@ -14,8 +14,8 @@
 
 
 #define MAX_INDEX_COUNT 100
-#define SINAGLE_MIN_AREA 200 // set the minimal single object area thres
-#define MIN_AREA_RATE 0.001
+#define SINAGLE_MIN_AREA 200 //设置单个画面上凸包的最小阈值
+#define MIN_AREA_RATE 0.001  //设置单个画面上所有凸包面积之和占比的最小阈值
 
 //declaration
 extern int readFrameLog(string logname);
@@ -33,6 +33,8 @@ string state;
 Rect selectarea;
 bool select_flag=false;
 bool setROI=false;
+bool setTimeTag=false;
+
 Mat image,imageRoi,showimage;
 //Video Index
 int currentFrameIndex=0;
@@ -138,7 +140,8 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 		for(int i=start; i<end; i++){
 			vc_read>>cur_mat;
 			imshow("Video Contains the Object",cur_mat);	
-			waitKey(0);
+			waitKey(20);
+			//waitKey(0);
 		}
 		destroyWindow("Video Contains the Object");
 	}
@@ -196,7 +199,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	user->UsersetGpu(false);
 	user->UsersetSingleMinArea(SINAGLE_MIN_AREA/(scale*scale));
 	user->UsersetMinArea(MIN_AREA_RATE);
-
+	user->UsersetTimeTag(false);
 	/*
 	*  different choices can excute different step ...
 	*/
@@ -391,13 +394,14 @@ int main(){
 	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
 		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
 		"Cam3.avi", "Cam4.avi"};
-	string testset2[] = {"shitang1.avi", "shitang2.avi", "shitang3.avi", "shitang4.avi", "shitang5.avi", "shitang6.avi", "shitang7.avi",
+	string testset5[] = {"shitang1.avi", "shitang2.avi", "shitang3.avi", "shitang4.avi", "shitang5.avi", "shitang6.avi", "shitang7.avi",
 		               "gaodangxiaoqu.avi", "jinrong.avi",  "sanloubangongshi.avi",  "20110915_14-17-35.avi", "20111202_082711.avi", "20111202_101331.avi",  "kakou.avi"};
 	string testset3[] = {"M2U00063.avi", "M2U00064.avi", "M2U00066.avi", "M2U00067.avi", "M2U00068.avi", "M2U00s069.avi", 
 						"MVI_5612.avi","20111201_170301.avi", "20111202_101331.avi", "20111202_082711.avi", 
 						"MVI_5613.avi","che 001.avi"};
 	string testset4[] = { "shitang5.avi", "M2U00067.avi", "LOD_CIF_HQ_4_2.avi", "testvideo.avi", "juminxiaoqu.avi", "loumenkou.avi", "road.avi","20111202_082713.avi"};
-	for(int i=0; i<14; i++){
+	string testset2[] = {"M2U00069.avi", "M2U00064.avi", "M2U00066.avi", "M2U00067.avi", "M2U00068.avi", "M2U00069.avi", "MVI_5612.avi","MVI_5613.avi"};
+	for(int i=0; i<1; i++){
 	//for(int i=0; i<testset2->size()-1; i++){
 		string result_name="new_result_"+testset2[i];
 		string config_name=testset2[i]+"_config";
@@ -408,9 +412,9 @@ int main(){
 		}
 		//boost::thread test1(testmultithread,"F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 1, true);
 		//test1.join();
-		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
-		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 2, true);
-		//testmultithread("F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 3, true);
+		//testmultithread("F:/TongHaoTest3/", testset2[i], config_name, result_name, 0, 8, 1, true);
+		//testmultithread("F:/TongHaoTest3/", testset2[i], config_name, result_name, 0, 8, 2, true);
+		testmultithread("F:/TongHaoTest3/", testset2[i], config_name, result_name, 0, 8, 3, true);
 	}
 	//for(int i=0; i<testset1->size(); i++){	
 	//	string result_name="result_"+testset1[i];

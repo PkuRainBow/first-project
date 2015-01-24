@@ -220,8 +220,12 @@ void VideoAbstraction::stitch(Mat& conflictMask, Mat &input1,Mat &input2,Mat &ou
 	end = end/framePerSecond;
 	vector<vector<Point>> m_contours;
 	vector<Point> info(0,0);
-	findContours(mask,m_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
-	putTextToMat(start, end, output, m_contours);
+
+	if(useTimeFlag)
+	{
+		findContours(mask,m_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
+		putTextToMat(start, end, output, m_contours);
+	}
 }
 
 int VideoAbstraction::ComponentLable(Mat& fg_mask, vector<Rect>& vComponents_out, int area_threshold)
@@ -467,10 +471,8 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 
 
 void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前背景分离函数
-	//cout<<objectarea<<"  "<<thres<<endl;
 	if(scaleSize > 1)
 	{
-		//pyrDown(currentFrame, currentFrame, Size(frameWidth,frameHeight));
 		resize(currentFrame, currentFrame, Size(frameWidth,frameHeight));
 	}
 	if(50==frameIndex)								//如果中间文件原来已经存在，则执行清空操作
@@ -931,6 +933,9 @@ int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int ste
 * 视频合成阶段 参数： 包含有结果文件名字的完整路径 eg. compound("F:/input/Test.avi")
 */
 void VideoAbstraction::compound(string path){	
+	//清空Replay 记录的信息
+	ofstream file_flush(Inputpath+"Replay/"+InputName, ios::trunc);
+	//create the output video ...
 	Outpath=path;	
 	cout<<Outpath<<endl;
 	backgroundImage=imread(InputName+"background.jpg");
@@ -942,28 +947,27 @@ void VideoAbstraction::compound(string path){
 		LOG(ERROR) <<"Can't create output video file: "<<Outpath<<endl;
 		return;
 	}
-
+	//running 2 thread to load contours and stitch process ...
 	LOG(INFO)<<"进入摘要视频合成..."<<endl;
 	clock_t starttime = clock();
-	//int currentIndex=0;
 	loadIndex=0;
 	EventNum=frame_start.size();
-
-	//
 	load_compound_finish=false;
 	mutex_compound.lock();
 	boost::thread run_load(&VideoAbstraction::thread_load, this);
 	boost::thread run_compound(&VideoAbstraction::thread_compound, this);
 	run_load.join();
 	run_compound.join();
-	//
-
-	videoWriter.release();			//  视频合成结束
+	//release the final compounded video ...
+	videoWriter.release();	
 	LOG(INFO)<<"合成结束\n";
 	LOG(INFO)<<"合成耗时"<<clock()-starttime<<"ms\n";
 	LOG(INFO)<<"总长度"<<sumLength<<endl;
 }
 
+/*
+*	读取中间文件的线程控制函数
+*/
 void VideoAbstraction::thread_load()
 {
 	int currentIndex=0;
@@ -975,8 +979,8 @@ void VideoAbstraction::thread_load()
 		LOG(INFO)<<"load the object cube to compound to the memory ..."<<endl;
 		maxLength=0;
 		curMaxLength=0;
+		//
 		loadObjectCube(currentIndex);
-		//boost::unique_lock<boost::mutex> l_lock(mutex_load);
 		mutex_load.lock();
 		offset=temp;
 		partToCompound.swap(tempToCompound);
@@ -1097,9 +1101,12 @@ void VideoAbstraction::postCompound(int& testcount, int offset, indexReplay& rep
 				int start = partToCompound[earliestIndex].start/framePerSecond;
 				int end = partToCompound[earliestIndex].end/framePerSecond;
 				vector<Point> info;
-				vector<vector<Point>> re_contours;		
-				findContours(resultMask,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
-				putTextToMat(start, end, currentResultFrame, re_contours);
+				vector<vector<Point>> re_contours;	
+				if(useTimeFlag)
+				{
+					findContours(resultMask,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
+					putTextToMat(start, end, currentResultFrame, re_contours);
+				}
 			}
 			rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
 				Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize), CV_RGB(0,255,0),2);
@@ -1128,8 +1135,11 @@ void VideoAbstraction::postCompound(int& testcount, int offset, indexReplay& rep
 					vector<Point> info;
 					vector<vector<Point>> re_contours;	
 					Mat mat1=vectorToMat(partToCopy[i].objectMask[j],frameHeight,frameWidth);
-					findContours(mat1,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
-					putTextToMat(start, end, currentResultFrame, re_contours);
+					if(useTimeFlag)
+					{
+						findContours(mat1,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
+						putTextToMat(start, end, currentResultFrame, re_contours);
+					}
 					//
 					int resultindex=getObjectIndex(i+offset+partToCompoundNum, j);
 					replay.saveEventsParamOfFrameToFile(testcount, (i+offset+partToCompoundNum), resultindex);
@@ -1167,7 +1177,6 @@ void VideoAbstraction::setGpu(bool isgpu){
 void VideoAbstraction::setROI(bool isroi){
 	useROI=isroi;
 }
-
 /*
 * 用保存图片格式进行索引的方法对于索引的图片上的值进行赋值操作
 */
