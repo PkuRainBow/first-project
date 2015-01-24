@@ -33,7 +33,7 @@ string state;
 //setROI=false by default 
 Rect selectarea;
 bool select_flag=false;
-bool setROI=true;
+bool setROI=false;
 Mat image,imageRoi,showimage;
 //Video Index
 int currentFrameIndex=0;
@@ -353,71 +353,64 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 }
 
 int main(){
-	cout<<"Please input your video path (like C:/TongHaoTestVideo/)"<<endl;
-	string testpath, filename, configname, resultname;
-	int choice;
-	cin>>testpath;
-	cout<<"Please input your test video name (!do not support chinese video name -- like gaodangxiaoqu.avi) : "<<endl;
-	cin>>filename;
-	while(filename!="quit")
-	{
-		cout<<"********************************************************"<<endl;
-		cout<<"\t"<<"Using Guidance "<<endl;
-		cout<<"\t"<<"Please input 1 / 2 "<<endl;
-		cout<<"\t"<<"1:   abstact & compound the input video"<<endl;
-		cout<<"\t"<<"2:   you can get the key frames"<<endl;
-		cout<<"\t"<<"others:   Exit !"<<endl;
-		cout<<"********************************************************"<<endl;
-		cout<<"Please input the choice No. : ";
-		cin>>choice;
-		if(choice==1)
-		{
-			cout<<"Start abstract and compound the final video ..."<<endl;
-			resultname="result_"+filename;
-			configname=filename+"_config";
-			testmultithread(testpath, filename, configname, resultname, 0, 8, 1, true);
-			testmultithread(testpath, filename, configname, resultname, 0, 8, 2, true);
-			cout<<"Finished abstact the final video ..."<<endl;
-		}
-		else if(choice==2)
-		{
-			cout<<"Get the key frames of the original video ..."<<endl;
-			testmultithread(testpath, filename, configname, resultname, 0, 8, 4, true);
-		}	
-	}
-
-	//string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
-	//	"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
-	//	"Cam3.avi", "Cam4.avi"};
-	//string testset2[] = {"shitang1.avi", "M2U00069.avi", "gaodangxiaoqu.avi","shitang5.avi", "shitang3.avi", "shitang2.avi", "shitang6.avi", "shitang7.avi","testvideo.avi", "jinrong.avi","shitang1.avi",
-	//	"三楼办公室.avi",  "20110915_14-17-35.avi",  "20111202_082711.avi","20111202_101331.avi",  "卡口 .avi"};
-	//string testset3[] = {"M2U00063.avi", "M2U00064.avi", "M2U00066.avi", "M2U00067.avi", "M2U00068.avi", "M2U00s069.avi", 
-	//					"MVI_5612.avi","20111201_170301.avi", "20111202_101331.avi", "20111202_082711.avi", 
-	//					"MVI_5613.avi","che 001.avi"};
-	//string testset4[] = {"20111202_082713.avi", "juminxiaoqu.avi", "LOD_CIF_HQ_4_2.avi", "loumenkou.avi", "road.avi"};
-	//for(int i=0; i<1; i++){
-	////for(int i=0; i<testset2->size(); i++){
-	//	string result_name="result_"+testset2[i];
-	//	string config_name=testset2[i]+"_config";
-	//	if(setROI)
+	//cout<<"Please input your video path (like C:/TongHaoTestVideo/)"<<endl;
+	//string testpath, filename, configname, resultname;
+	//int choice;
+	//cin>>testpath;
+	//cout<<"Please input your test video name (!do not support chinese video name -- like gaodangxiaoqu.avi) : "<<endl;
+	//cin>>filename;
+	//while(filename!="quit")
+	//{
+	//	cout<<"********************************************************"<<endl;
+	//	cout<<"\t"<<"Using Guidance "<<endl;
+	//	cout<<"\t"<<"Please input 1 / 2 "<<endl;
+	//	cout<<"\t"<<"1:   abstact & compound the input video"<<endl;
+	//	cout<<"\t"<<"2:   you can get the key frames"<<endl;
+	//	cout<<"\t"<<"others:   Exit !"<<endl;
+	//	cout<<"********************************************************"<<endl;
+	//	cout<<"Please input the choice No. : ";
+	//	cin>>choice;
+	//	if(choice==1)
 	//	{
-	//		result_name="ROI"+result_name;
-	//		config_name="ROI"+config_name;
+	//		cout<<"Start abstract and compound the final video ..."<<endl;
+	//		resultname="result_"+filename;
+	//		configname=filename+"_config";
+	//		testmultithread(testpath, filename, configname, resultname, 0, 8, 1, true);
+	//		testmultithread(testpath, filename, configname, resultname, 0, 8, 2, true);
+	//		cout<<"Finished abstact the final video ..."<<endl;
 	//	}
-	//	testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
-	//	testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 2, true);
-	//	//testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 3, true);
-	//	//testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 4, true);
+	//	else if(choice==2)
+	//	{
+	//		cout<<"Get the key frames of the original video ..."<<endl;
+	//		testmultithread(testpath, filename, configname, resultname, 0, 8, 4, true);
+	//	}	
 	//}
 
-	//for(int i=2; i<3; i++){	
-	//	string result_name="result_"+testset2[i]+"cpu";
-	//	string config_name="config_"+testset2[i]+"cpu";
-	//	testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
-	//	testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 2, true);
-	//	cout<<"finished..."<<endl;
-	//}
-
+	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
+		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
+		"Cam3.avi", "Cam4.avi"};
+	string testset4[] = {"shitang1.avi", "M2U00069.avi", "gaodangxiaoqu.avi","shitang5.avi", "shitang3.avi", "shitang2.avi", "shitang6.avi", "shitang7.avi","testvideo.avi", "jinrong.avi","shitang1.avi",
+		"三楼办公室.avi",  "20110915_14-17-35.avi",  "20111202_082711.avi","20111202_101331.avi",  "卡口 .avi"};
+	string testset3[] = {"M2U00063.avi", "M2U00064.avi", "M2U00066.avi", "M2U00067.avi", "M2U00068.avi", "M2U00s069.avi", 
+						"MVI_5612.avi","20111201_170301.avi", "20111202_101331.avi", "20111202_082711.avi", 
+						"MVI_5613.avi","che 001.avi"};
+	string testset2[] = {"testvideo.avi","M2U00067.avi","shitang5.avi", "juminxiaoqu.avi", "LOD_CIF_HQ_4_2.avi", "loumenkou.avi", "road.avi","20111202_082713.avi"};
+	
+	for(int i=0; i<1; i++){
+	//for(int i=0; i<testset2->size()-1; i++){
+		string result_name="new_result_"+testset2[i];
+		string config_name=testset2[i]+"_config";
+		if(setROI)
+		{
+			result_name="ROI"+result_name;
+			config_name="ROI"+config_name;
+		}
+		//boost::thread test1(testmultithread,"F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 1, true);
+		//test1.join();
+		testmultithread("F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 1, true);
+		testmultithread("F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 2, true);
+		//testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 4, true);
+	}
 	//for(int i=0; i<testset1->size(); i++){	
 	//	string result_name="result_"+testset1[i];
 	//	string config_name="config_"+boost::lexical_cast<string>(i);

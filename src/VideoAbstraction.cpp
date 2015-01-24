@@ -172,36 +172,51 @@ Mat vectorToMat(vector<bool> &input,int row,int col){
 	return re;
 }
 
-void VideoAbstraction::stitch(Mat &input1,Mat &input2,Mat &output,Mat &back,Mat &mask,int start,int end, int frameno){
+void VideoAbstraction::stitch(Mat& conflictMask, Mat &input1,Mat &input2,Mat &output,Mat &back,Mat &mask,int start,int end, int frameno){
 //void VideoAbstraction::stitch(Mat &input1,Mat &input2,Mat &output,Mat &back,Mat &mask,int start,int end, vector<vector<Point>>& re_contours, bool& flag){
 	int step10=input1.step,step11=input1.elemSize();
 	int step20=input2.step,step21=input2.elemSize();
 	int step30=output.step,step31=output.elemSize();
 	int stepb1=back.step,stepb2=back.elemSize();
 	int stepm1=mask.step,stepm2=mask.elemSize();
+	//stitch
+	int stepc1=conflictMask.step,stepc2=conflictMask.elemSize();
+
 	int input1sim,input2sim;
 	double alpha;
-	uchar* indata1,*indata2,*outdata,*mdata,*bdata;
+	uchar* indata1,*indata2,*outdata,*mdata,*bdata,*cdata;
 	for(int i=0;i<input1.rows;i++)
 	{
 		for(int j=0;j<input1.cols;j++)
 		{
 			mdata=mask.data+i*stepm1+j*stepm2;
+			cdata=conflictMask.data+i*stepc1+j*stepc2;
 			if((*mdata)!=0)
 			{
 				indata1=input1.data+i*step10+j*step11;
 				indata2=input2.data+i*step20+j*step21;
 				outdata=output.data+i*step30+j*step31;
-				bdata=back.data+i*stepb1+j*stepb2;
-				input1sim=abs(bdata[0]-indata1[0])+abs(bdata[1]-indata1[1])+abs(bdata[2]-indata1[2])+1;
-				input2sim=abs(bdata[0]-indata2[0])+abs(bdata[1]-indata2[1])+abs(bdata[2]-indata2[2])+1;
-				alpha=input1sim*1.0/(input1sim+input2sim);
-				outdata[0]=int(indata1[0]*alpha+indata2[0]*(1-alpha));
-				outdata[1]=int(indata1[1]*alpha+indata2[1]*(1-alpha));
-				outdata[2]=int(indata1[2]*alpha+indata2[2]*(1-alpha));
+				if((*cdata)!=0)
+				{
+					bdata=back.data+i*stepb1+j*stepb2;
+					input1sim=abs(bdata[0]-indata1[0])+abs(bdata[1]-indata1[1])+abs(bdata[2]-indata1[2])+1;
+					input2sim=abs(bdata[0]-indata2[0])+abs(bdata[1]-indata2[1])+abs(bdata[2]-indata2[2])+1;
+					alpha=input1sim*1.0/(input1sim+input2sim);
+					outdata[0]=int(indata1[0]*alpha+indata2[0]*(1-alpha));
+					outdata[1]=int(indata1[1]*alpha+indata2[1]*(1-alpha));
+					outdata[2]=int(indata1[2]*alpha+indata2[2]*(1-alpha));
+				}
+				else
+				{
+					outdata[0]=(int)indata1[0];
+					outdata[1]=(int)indata1[1];
+					outdata[2]=(int)indata1[2];
+				}
+				(*cdata)=255;
 			}
 		}
 	}
+	//stitch 
 	/*
 	* put the time tag on all the convex hull
 	*/
@@ -532,12 +547,13 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 		{							   //判断当前的图像帧是否包含有意义的运动序列信息
 			currentObject.objectMask.push_back(matToVector(currentMask));					//将当前帧添加到运动序列中
 			if(currentObject.start<0) currentObject.start=frameIndex;
-			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*10)	//当前运动序列太长，认为其实无意义的运动序列（比如一直摇动的树叶信息或者光线变化），则清空成功新开始
+			//can not abandon any object sequence including very long event ...
+			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*10)
 			{
-				currentObject.objectMask.clear();
-				currentObject.start=-1;
-				flag=false;
-				noObjectCount=0;
+				//currentObject.objectMask.clear();
+				//currentObject.start=-1;
+				//flag=false;
+				//noObjectCount=0;
 			}
 			if(sum<thres)				   //当前图像中无运动序列
 			{
@@ -550,7 +566,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 						currentLength=currentObject.end-currentObject.start+1;
 						if(currentLength>maxLengthToSpilt*10)
 						{								//运动序列的长度太长，是无意义的运动序列，直接丢弃
-							detectedMotion--;
+							//detectedMotion--;
 						} 
 						//change split number ...
 						else if(currentLength>maxLengthToSpilt*8)
@@ -988,6 +1004,9 @@ void VideoAbstraction::compound(string path){
 		sumLength+=(curMaxLength-startCompound);	
 		for(int j=startCompound;j<curMaxLength;j++)
 		{
+			//stitch problem
+			Mat accumlatedMask;
+			//stitch problem
 			testcount++;
 			bool haveFrame=false;
 			Mat resultMask, tempMask;
@@ -1012,6 +1031,9 @@ void VideoAbstraction::compound(string path){
 				resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
 				currentResultFrame=currentFrame.clone();
 				resultMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);
+				//stitch problem
+				resultMask.copyTo(accumlatedMask);
+				//stitch problem
 				int offIndex=j-shift[earliestIndex]+1;
 				int resultindex=getObjectIndex(earliestIndex+offset, offIndex);
 				//index Video setting ...
@@ -1041,7 +1063,7 @@ void VideoAbstraction::compound(string path){
 					int resultindex=getObjectIndex(i+offset, offIndex);
 					//index Video setting ...
 					replay.saveEventsParamOfFrameToFile(testcount, (i+offset), resultindex);
-					stitch(currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
+					stitch(accumlatedMask, currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
 					currentMask.release();
 				}
 			}

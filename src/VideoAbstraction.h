@@ -136,7 +136,7 @@ public:
 	void setVideoFormat(string Format);
 	void postProc(Mat& frame);															//对得到的帧图像进行后处理(去噪 连通区域处理 凸包计算 膨胀腐蚀)							
 	void ConnectedComponents(int frameindex, Mat &mask,int thres);										//凸包计算---连通区域计算算法的实现
-	void stitch(Mat &input1,Mat &input2,Mat &output,Mat &back,Mat &mask,int start,int end, int frameno);	//拼接图片帧序列并输出
+	void stitch(Mat &conflictMask,Mat &input1,Mat &input2,Mat &output,Mat &back,Mat &mask,int start,int end, int frameno);	//拼接图片帧序列并输出
 //	void stitch(Mat &input1,Mat &input2,Mat &output,Mat &back,Mat &mask,int start,int end,vector<vector<Point>>& re_contours, bool& flag);	//拼接图片帧序列并输出
 //	void stitch(Mat &input1,Mat &input2,Mat &output,Mat &back,vector<bool> &mask,int start,int end);
 	Mat join(Mat &input1,Mat &input2,int type);											// Returns: cv::Mat 合并两幅图像，Parameter: int type 1表示灰度图，3表示彩色图  
