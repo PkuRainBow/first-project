@@ -193,7 +193,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	//create the VideoAbstraction Object and intialize the GPU setting and related threshold ...
 	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
-	user->UsersetGpu(true);
+	user->UsersetGpu(false);
 	user->UsersetSingleMinArea(SINAGLE_MIN_AREA/(scale*scale));
 	user->UsersetMinArea(MIN_AREA_RATE);
 
@@ -394,8 +394,7 @@ int main(){
 	string testset3[] = {"M2U00063.avi", "M2U00064.avi", "M2U00066.avi", "M2U00067.avi", "M2U00068.avi", "M2U00s069.avi", 
 						"MVI_5612.avi","20111201_170301.avi", "20111202_101331.avi", "20111202_082711.avi", 
 						"MVI_5613.avi","che 001.avi"};
-	string testset2[] = {"testvideo.avi","M2U00067.avi","shitang5.avi", "juminxiaoqu.avi", "LOD_CIF_HQ_4_2.avi", "loumenkou.avi", "road.avi","20111202_082713.avi"};
-	
+	string testset2[] = {"LOD_CIF_HQ_4_2.avi", "testvideo.avi","M2U00067.avi","shitang5.avi", "juminxiaoqu.avi", "loumenkou.avi", "road.avi","20111202_082713.avi"};
 	for(int i=0; i<1; i++){
 	//for(int i=0; i<testset2->size()-1; i++){
 		string result_name="new_result_"+testset2[i];

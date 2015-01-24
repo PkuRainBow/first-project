@@ -46,7 +46,7 @@ void VideoAbstraction::init(){
 	cacheShift=50;
 	motionToCompound=10;
 	maxLength=-1;
-	maxLengthToSpilt=300;
+	maxLengthToSpilt=1000;
 	sum=0;
 	thres=0.001;
 	currentLength=0;
@@ -518,6 +518,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 
 				//xincoder_start
 				xincoder_ConnectedComponents(frameIndex,currentMask,10);
+				dilate(gForegroundMask,gForegroundMask,cv::Mat());
 				//xincoder_end
 			}
 			else
@@ -548,12 +549,12 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			currentObject.objectMask.push_back(matToVector(currentMask));					//将当前帧添加到运动序列中
 			if(currentObject.start<0) currentObject.start=frameIndex;
 			//can not abandon any object sequence including very long event ...
-			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*10)
+			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*60) //maxLengthToSplit ~ 1000frames ~ 40s ~ 60*40s ~ 40min
 			{
-				//currentObject.objectMask.clear();
-				//currentObject.start=-1;
-				//flag=false;
-				//noObjectCount=0;
+				currentObject.objectMask.clear();
+				currentObject.start=-1;
+				flag=false;
+				noObjectCount=0;
 			}
 			if(sum<thres)				   //当前图像中无运动序列
 			{
@@ -564,12 +565,12 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 					{								//运动序列长度大于 30 才认为是有效运动，否则不认为其是运动的
 						detectedMotion++;
 						currentLength=currentObject.end-currentObject.start+1;
-						if(currentLength>maxLengthToSpilt*10)
+						if(currentLength>maxLengthToSpilt*60)
 						{								//运动序列的长度太长，是无意义的运动序列，直接丢弃
-							//detectedMotion--;
+							detectedMotion--;
 						} 
 						//change split number ...
-						else if(currentLength>maxLengthToSpilt*8)
+						else if(currentLength>maxLengthToSpilt*2)
 						{							//事件过长 进行切分处理
 							LOG(INFO)<<"事件过长:"<<currentLength<<endl;
 							int spilt=currentLength/maxLengthToSpilt+1;
@@ -691,8 +692,11 @@ string VideoAbstraction::loadObjectCube(int bias, vector<vector<Point>>& contour
 
 
 void VideoAbstraction::loadObjectCube(int& currentIndex){
+	vector<ObjectCube>().swap(partToCompound);
+	vector<ObjectCube>().swap(partToCopy);
 	partToCompoundNum=0;
 	partToCopyNum=0;
+
 	ifstream file(Configpath+MidName);
 	string temp;
 	/*
@@ -752,6 +756,7 @@ void VideoAbstraction::loadObjectCube(int& currentIndex){
 			partToCompoundNum++;
 		}
 	}
+	//
 }
 
 void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指定事件序列号范围内的运动帧导入 partToCompound 和 partToCopy 中
@@ -974,153 +979,7 @@ void VideoAbstraction::compound(string path){
 		maxLength=0;
 		curMaxLength=0;														//正常合成 motionToCompound 个运动序列
 		loadObjectCube(currentIndex);	
-		/*
-		* 计算需要合成的序列的偏移量
-		*/
-		LOG(INFO)<<"compute the shift array for the object sequences ..."<<endl;
-		LOG(INFO)<<"Compound sequences number: "<<partToCompoundNum<<endl;
-		synopsis=partToCompoundNum;
-		vector<int> shift(synopsis,0);
-		computeShift(shift, partToCompound);	
-		/*
-		* 根据求解出来的偏移量进行合成操作
-		*/
-		LOG(INFO)<<"start to compound the shifted sequences ..."<<endl;	
-		starttime=clock();
-		Mat currentFrame;
-		Mat currentResultFrame;
-		Mat tempFrame;
-		for(int i=0;i<synopsis;i++)
-		{
-			cout<<"shift "<<i+1<<"\t"<<shift[i]<<endl;
-		}
-		int startCompound=INT_MAX;
-		for(int i=0;i<synopsis;i++)
-		{
-			startCompound=std::min(shift[i],startCompound);
-		}
-		cout<<"start\t"<<startCompound<<endl;
-		cout<<"end\t"<<curMaxLength<<endl;
-		sumLength+=(curMaxLength-startCompound);	
-		for(int j=startCompound;j<curMaxLength;j++)
-		{
-			//stitch problem
-			Mat accumlatedMask;
-			//stitch problem
-			testcount++;
-			bool haveFrame=false;
-			Mat resultMask, tempMask;
-			Mat indexMat(Size(frameWidth,frameHeight), CV_8U);
-			int earliest=INT_MIN,earliestIndex=-1;
-			for(int i=0;i<synopsis;i++)
-			{	//寻找序列中开始时间最早的作为背景
-				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j)
-				{
-					if(partToCompound[i].end>earliest)
-					{
-						earliest=partToCompound[i].end;
-						earliestIndex=i;
-					}
-				}
-			}
-			if(earliestIndex>-1)
-			{
-				haveFrame=true;
-				videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[earliestIndex].start-1+j-shift[earliestIndex]);
-				videoCapture>>currentFrame;
-				resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
-				currentResultFrame=currentFrame.clone();
-				resultMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);
-				//stitch problem
-				resultMask.copyTo(accumlatedMask);
-				//stitch problem
-				int offIndex=j-shift[earliestIndex]+1;
-				int resultindex=getObjectIndex(earliestIndex+offset, offIndex);
-				//index Video setting ...
-				replay.saveEventsParamOfFrameToFile(testcount, earliestIndex+offset, resultindex);
-			}
-			if(!haveFrame)
-			{
-				cout<<"没有找到最早\n";
-				break;
-			}
-
-			for(int i=0;i<synopsis;i++)
-			{
-				if(i==earliestIndex)
-				{
-					continue;
-				}
-				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j)
-				{
-					videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[i].start-1+j-shift[i]); //设置背景图片
-					videoCapture>>currentFrame;
-					//pyrDown(currentFrame, currentFrame, Size(frameWidth, frameHeight));
-					resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
-					currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
-					//获取偏移后的正确的位移
-					int offIndex=j-shift[i]+1;
-					int resultindex=getObjectIndex(i+offset, offIndex);
-					//index Video setting ...
-					replay.saveEventsParamOfFrameToFile(testcount, (i+offset), resultindex);
-					stitch(accumlatedMask, currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
-					currentMask.release();
-				}
-			}
-			if(earliestIndex>-1)
-			{
-				int start = partToCompound[earliestIndex].start/framePerSecond;
-				int end = partToCompound[earliestIndex].end/framePerSecond;
-				vector<Point> info;
-				vector<vector<Point>> re_contours;		
-				findContours(resultMask,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
-				putTextToMat(start, end, currentResultFrame, re_contours);
-			}
-			rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
-				Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize), CV_RGB(0,255,0),2);
-			videoWriter.write(currentResultFrame);
-			//
-			//imshow("compound",currentResultFrame);
-			//waitKey(1);
-		}
-		//deal with the scene change cases ...
-		if(partToCopyNum>0)
-		{
-			cout<<"*************    partToCopy part    ***********"<<endl;
-			cout<<"Copy sequences number: "<<partToCopyNum<<endl;
-			for(int i=0; i<partToCopyNum; i++)
-			{
-				int start = partToCopy[i].start/framePerSecond;
-				int end = partToCopy[i].end/framePerSecond;
-				int length = partToCopy[i].end-partToCopy[i].start+1;
-				int base_index = partToCopy[i].start;
-				sumLength += length;
-				for(int j=0; j<length; j++)
-				{
-					videoCapture.set(CV_CAP_PROP_POS_FRAMES,j+base_index);
-					videoCapture>>currentResultFrame;
-					resize(currentResultFrame, currentResultFrame, Size(frameWidth, frameHeight));
-					vector<Point> info;
-					vector<vector<Point>> re_contours;	
-					Mat mat1=vectorToMat(partToCopy[i].objectMask[j],frameHeight,frameWidth);
-					findContours(mat1,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
-					putTextToMat(start, end, currentResultFrame, re_contours);
-					//
-					int resultindex=getObjectIndex(i+offset+partToCompoundNum, j);
-					replay.saveEventsParamOfFrameToFile(testcount, (i+offset+partToCompoundNum), resultindex);
-					//
-					rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
-						Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize),CV_RGB(0,255,0),2);
-					testcount++;
-					videoWriter.write(currentResultFrame);
-					//
-					//imshow("compound",currentResultFrame);
-					//waitKey(1);
-				}
-			}
-		}
-		currentFrame.release();
-		currentResultFrame.release();
+		postCompound(testcount, offset, replay);
 	}
 	videoWriter.release();			//  视频合成结束
 	LOG(INFO)<<"合成结束\n";
@@ -1402,3 +1261,150 @@ void  VideoAbstraction::setFilter(vector<bool>& filter, Rect& rec, int size)
 void VideoAbstraction::writePartToCompound(vector<ObjectCube>& pCompound){}
 
 void VideoAbstraction::writePartToCopy(vector<ObjectCube>& pCopy){}
+
+void VideoAbstraction::postCompound(int& testcount, int offset, indexReplay& replay){
+		/*
+		* 计算需要合成的序列的偏移量
+		*/
+		LOG(INFO)<<"compute the shift array for the object sequences ..."<<endl;
+		LOG(INFO)<<"Compound sequences number: "<<partToCompoundNum<<endl;
+		int synopsis=partToCompoundNum;
+		vector<int> shift(synopsis,0);
+		computeShift(shift, partToCompound);	
+		/*
+		* 根据求解出来的偏移量进行合成操作
+		*/
+		LOG(INFO)<<"start to compound the shifted sequences ..."<<endl;	
+		Mat currentFrame;
+		Mat currentResultFrame;
+		Mat tempFrame;
+		for(int i=0;i<synopsis;i++)
+		{
+			cout<<"shift "<<i+1<<"\t"<<shift[i]<<endl;
+		}
+		int startCompound=INT_MAX;
+		for(int i=0;i<synopsis;i++)
+		{
+			startCompound=std::min(shift[i],startCompound);
+		}
+		cout<<"start\t"<<startCompound<<endl;
+		cout<<"end\t"<<curMaxLength<<endl;
+		sumLength+=(curMaxLength-startCompound);	
+		for(int j=startCompound;j<curMaxLength;j++)
+		{
+			//stitch problem
+			Mat accumlatedMask;
+			//stitch problem
+			testcount++;
+			bool haveFrame=false;
+			Mat resultMask, tempMask;
+			Mat indexMat(Size(frameWidth,frameHeight), CV_8U);
+			int earliest=INT_MIN,earliestIndex=-1;
+			for(int i=0;i<synopsis;i++)
+			{	//寻找序列中开始时间最早的作为背景
+				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j)
+				{
+					if(partToCompound[i].end>earliest)
+					{
+						earliest=partToCompound[i].end;
+						earliestIndex=i;
+					}
+				}
+			}
+			if(earliestIndex>-1)
+			{
+				haveFrame=true;
+				videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[earliestIndex].start-1+j-shift[earliestIndex]);
+				videoCapture>>currentFrame;
+				resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
+				currentResultFrame=currentFrame.clone();
+				resultMask=vectorToMat(partToCompound[earliestIndex].objectMask[j-shift[earliestIndex]],frameHeight,frameWidth);
+				//stitch problem
+				resultMask.copyTo(accumlatedMask);
+				//stitch problem
+				int offIndex=j-shift[earliestIndex]+1;
+				int resultindex=getObjectIndex(earliestIndex+offset, offIndex);
+				//index Video setting ...
+				replay.saveEventsParamOfFrameToFile(testcount, earliestIndex+offset, resultindex);
+			}
+			if(!haveFrame)
+			{
+				cout<<"没有找到最早\n";
+				break;
+			}
+
+			for(int i=0;i<synopsis;i++)
+			{
+				if(i==earliestIndex)
+				{
+					continue;
+				}
+				if(shift[i]<=j&&shift[i]+partToCompound[i].end-partToCompound[i].start+1>j)
+				{
+					videoCapture.set(CV_CAP_PROP_POS_FRAMES,partToCompound[i].start-1+j-shift[i]); //设置背景图片
+					videoCapture>>currentFrame;
+					//pyrDown(currentFrame, currentFrame, Size(frameWidth, frameHeight));
+					resize(currentFrame, currentFrame, Size(frameWidth, frameHeight));
+					currentMask=vectorToMat(partToCompound[i].objectMask[j-shift[i]],frameHeight,frameWidth);
+					//获取偏移后的正确的位移
+					int offIndex=j-shift[i]+1;
+					int resultindex=getObjectIndex(i+offset, offIndex);
+					//index Video setting ...
+					replay.saveEventsParamOfFrameToFile(testcount, (i+offset), resultindex);
+					stitch(accumlatedMask, currentFrame,currentResultFrame,currentResultFrame,backgroundImage,currentMask,partToCompound[i].start,partToCompound[i].end, j);
+					currentMask.release();
+				}
+			}
+			if(earliestIndex>-1)
+			{
+				int start = partToCompound[earliestIndex].start/framePerSecond;
+				int end = partToCompound[earliestIndex].end/framePerSecond;
+				vector<Point> info;
+				vector<vector<Point>> re_contours;		
+				findContours(resultMask,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
+				putTextToMat(start, end, currentResultFrame, re_contours);
+			}
+			rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
+				Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize), CV_RGB(0,255,0),2);
+			videoWriter.write(currentResultFrame);
+			//
+			//imshow("compound",currentResultFrame);
+			//waitKey(1);
+		}
+		//deal with the scene change cases ...
+		if(partToCopyNum>0)
+		{
+			cout<<"*************    partToCopy part    ***********"<<endl;
+			cout<<"Copy sequences number: "<<partToCopyNum<<endl;
+			for(int i=0; i<partToCopyNum; i++)
+			{
+				int start = partToCopy[i].start/framePerSecond;
+				int end = partToCopy[i].end/framePerSecond;
+				int length = partToCopy[i].end-partToCopy[i].start+1;
+				int base_index = partToCopy[i].start;
+				sumLength += length;
+				for(int j=0; j<length; j++)
+				{
+					videoCapture.set(CV_CAP_PROP_POS_FRAMES,j+base_index);
+					videoCapture>>currentResultFrame;
+					resize(currentResultFrame, currentResultFrame, Size(frameWidth, frameHeight));
+					vector<Point> info;
+					vector<vector<Point>> re_contours;	
+					Mat mat1=vectorToMat(partToCopy[i].objectMask[j],frameHeight,frameWidth);
+					findContours(mat1,re_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
+					putTextToMat(start, end, currentResultFrame, re_contours);
+					//
+					int resultindex=getObjectIndex(i+offset+partToCompoundNum, j);
+					replay.saveEventsParamOfFrameToFile(testcount, (i+offset+partToCompoundNum), resultindex);
+					//
+					rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
+						Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize),CV_RGB(0,255,0),2);
+					testcount++;
+					videoWriter.write(currentResultFrame);
+				}
+			}
+		}
+		currentFrame.release();
+		currentResultFrame.release();
+}
+

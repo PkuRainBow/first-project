@@ -79,7 +79,12 @@ public:
 	vector<ObjectCube> partToCopy;      //存储视角发生移动的场景，直接复制不参与到复制运动序列中
 	int partToCompoundNum;
 	int partToCopyNum;
-
+	//deal with the temp resourses ...
+	vector<ObjectCube> tempToCompound;	//存储需要合成的多个运动序列
+	vector<ObjectCube> tempToCopy;      //存储视角发生移动的场景，直接复制不参与到复制运动序列中
+	int tempToCompoundNum;
+	int tempToCopyNum;
+	//
 	Mat backgroundImage;				//存储 混合高斯模型提取出的 背景信息------分割程序运行的第二步需要操作的部分
 	Mat currentStartIndex,currentEndIndex;
 
@@ -198,4 +203,6 @@ public:
 	void computeShift(vector<int>& shift, vector<ObjectCube>& pCompound);
 	bool checkROI(ObjectCube& ob, vector<bool>& filter);
 	void setFilter(vector<bool>& filter, Rect& rec, int size);
+	//split The loading object process & The stitching process
+	void postCompound(int& testcount, int offset, indexReplay& replay);
 };
