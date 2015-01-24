@@ -27,7 +27,6 @@ static void bar_callback(int index,void* userdata);
 
 //variable definition
 string testVideoName;
-string log_path;
 string state;
 //ROI-set 
 //setROI=false by default 
@@ -124,6 +123,7 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 				maxCount = event_count[i];
 			}
 		}
+
 		LOG(INFO)<<"selected event No. is "<<ID<<endl;	
 		cout<<event_start.size()<<endl;
 		int start=event_start[ID];
@@ -165,7 +165,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	string index_path=path+"indexMat/";
 	string replay_path=path+"Replay/";
 	string keyframe_path=path+"KeyFrame/";
-	log_path=path+"Log/";
+	string log_path=path+"Log/";
 	//create the path if not exist
 	util::create_path(out_path);
 	util::create_path(log_path);
@@ -202,7 +202,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	*/
 	int test = stage;
 	//record the excution related time information ...
-	ofstream ff(log_path+"TimeLog.txt", ofstream::app);
+	ofstream ff_time(log_path+"TimeLog.txt", ofstream::app);
 	//choice 1:   Background/Foreground Subtraction
 	if(test==1)
 	{
@@ -212,8 +212,9 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		string t3 = t1+t2;
 		capture.open(t3);
 		//record the frame number related information ...
-		ofstream ff(log_path+"FrameLog.txt", ofstream::app);
-		ff<<endl<<videoname<<"\t"<<capture.get(CV_CAP_PROP_FRAME_COUNT);
+
+		ofstream ff_frame(log_path+videoname+"FrameLog.txt", ofstream::app);
+		ff_frame<<endl<<videoname<<"\t"<<capture.get(CV_CAP_PROP_FRAME_COUNT);
 		int number=0;
 		while (capture.read(image))
 		{
@@ -225,8 +226,9 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 				waitKey(0);
 				cvDestroyWindow("video");
 				//record the ROI area related information ...
-				ofstream ff(log_path+"AreaLog.txt", ofstream::app);
-				ff<<endl<<selectarea.x<<":"<<selectarea.y<<":"<<selectarea.width<<":"<<selectarea.height;
+				ofstream ff_area(log_path+videoname+"AreaLog.txt", ofstream::app);
+				ff_area<<endl<<selectarea.x<<":"<<selectarea.y<<":"<<selectarea.width<<":"<<selectarea.height;
+				ff_area.close();
 			}
 			number++;
 			user->UserAbstraction(image,number);
@@ -235,8 +237,8 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		frameCount=UsedFrameCount;
 		user->~UserVideoAbstraction();
 		//record the used frame count information ...
-		ff<<"\t"<<UsedFrameCount<<"\t"<<(double)UsedFrameCount/(double)capture.get(CV_CAP_PROP_FRAME_COUNT)<<":"<<UsedFrameCount;
-		ff.close();
+		ff_frame<<"\t"<<UsedFrameCount<<"\t"<<(double)UsedFrameCount/(double)capture.get(CV_CAP_PROP_FRAME_COUNT)<<":"<<UsedFrameCount;
+		ff_frame.close();
 	}
 
 	//choice 2: compound the result video based on the choice 1
@@ -247,7 +249,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		if(setROI){
 			int x,y,width,height;
 			//get the ROI information recorded in the AreaLog.txt ...
-			readAreaLog(log_path+"AreaLog.txt", x, y, width, height);
+			readAreaLog(log_path+videoname+"AreaLog.txt", x, y, width, height);
 			Rect selectRoi(x,y,width,height);
 			//Set the ROI information and create the filter 0/1 mat ...
 			user->UsergetROI(selectRoi);
@@ -260,7 +262,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		int frCount;
 		//get the frameCount info from the FrameLog.txt ...
 		if(readlog)
-			frCount=readFrameLog(log_path+"FrameLog.txt");
+			frCount=readFrameLog(log_path+videoname+"FrameLog.txt");
 		else
 			frCount=frameCount;
 		//excute the compound step to compound the final output video ...
@@ -274,7 +276,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		state="test the index video function";
 		int frCount;
 		if(readlog)
-			frCount=readFrameLog(log_path+"FrameLog.txt");
+			frCount=readFrameLog(log_path+videoname+"FrameLog.txt");
 		else
 			frCount=frameCount;
 		string t1=inputpath,t2=midname,t=videoname;
@@ -333,7 +335,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		string t1=inputpath,t2=midname,t3=videoname,temp;
 		int frCount;
 		if(readlog)
-			frCount=readFrameLog(log_path+"FrameLog.txt");
+			frCount=readFrameLog(log_path+videoname+"FrameLog.txt");
 		else
 			frCount=frameCount;
 		user->UserGetKeyFrame(keyframe_path+t3+"/",frCount);
@@ -348,8 +350,8 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	end_time=time(NULL);
 	//output the time information to the cmd and timeLog Information ...
 	cout<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<" s"<<endl;
-	ff<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<endl;
-	ff.close();
+	ff_time<<testVideoName<<"\t"<<state<<"\t"<<"video abstraction time: "<<end_time-start_time<<endl;
+	ff_time.close();
 }
 
 int main(){
@@ -389,13 +391,13 @@ int main(){
 	string testset1[] = {"20111201_170301.avi", "20111202_082713.avi", "juminxiaoqu.avi", "testvideo.avi", "xiezilou.avi", "LOD_CIF_HQ_4_2.avi",
 		"road.avi", "loumenkou.avi", "damenkou.avi", "AA012507.avi", "AA013101.avi", "AA013102.avi", "AA013103.avi", "AA013106.avi", "Cam01.avi", 
 		"Cam3.avi", "Cam4.avi"};
-	string testset4[] = {"shitang1.avi", "M2U00069.avi", "gaodangxiaoqu.avi","shitang5.avi", "shitang3.avi", "shitang2.avi", "shitang6.avi", "shitang7.avi","testvideo.avi", "jinrong.avi","shitang1.avi",
-		"三楼办公室.avi",  "20110915_14-17-35.avi",  "20111202_082711.avi","20111202_101331.avi",  "卡口 .avi"};
+	string testset2[] = {"shitang1.avi", "shitang2.avi", "shitang3.avi", "shitang4.avi", "shitang5.avi", "shitang6.avi", "shitang7.avi",
+		               "gaodangxiaoqu.avi", "jinrong.avi",  "sanloubangongshi.avi",  "20110915_14-17-35.avi", "20111202_082711.avi", "20111202_101331.avi",  "kakou.avi"};
 	string testset3[] = {"M2U00063.avi", "M2U00064.avi", "M2U00066.avi", "M2U00067.avi", "M2U00068.avi", "M2U00s069.avi", 
 						"MVI_5612.avi","20111201_170301.avi", "20111202_101331.avi", "20111202_082711.avi", 
 						"MVI_5613.avi","che 001.avi"};
-	string testset2[] = {"LOD_CIF_HQ_4_2.avi", "testvideo.avi","M2U00067.avi","shitang5.avi", "juminxiaoqu.avi", "loumenkou.avi", "road.avi","20111202_082713.avi"};
-	for(int i=0; i<1; i++){
+	string testset4[] = { "shitang5.avi", "M2U00067.avi", "LOD_CIF_HQ_4_2.avi", "testvideo.avi", "juminxiaoqu.avi", "loumenkou.avi", "road.avi","20111202_082713.avi"};
+	for(int i=0; i<14; i++){
 	//for(int i=0; i<testset2->size()-1; i++){
 		string result_name="new_result_"+testset2[i];
 		string config_name=testset2[i]+"_config";
@@ -406,9 +408,9 @@ int main(){
 		}
 		//boost::thread test1(testmultithread,"F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 1, true);
 		//test1.join();
-		testmultithread("F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 1, true);
-		testmultithread("F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 2, true);
-		//testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 4, true);
+		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 1, true);
+		testmultithread("F:/TongHaoTest2/", testset2[i], config_name, result_name, 0, 8, 2, true);
+		//testmultithread("F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 3, true);
 	}
 	//for(int i=0; i<testset1->size(); i++){	
 	//	string result_name="result_"+testset1[i];

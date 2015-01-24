@@ -84,6 +84,11 @@ public:
 	vector<ObjectCube> tempToCopy;      //存储视角发生移动的场景，直接复制不参与到复制运动序列中
 	int tempToCompoundNum;
 	int tempToCopyNum;
+	int offset;
+	//mutex
+	boost::mutex mutex_load, mutex_compound;
+	bool load_compound_finish;
+	
 	//
 	Mat backgroundImage;				//存储 混合高斯模型提取出的 背景信息------分割程序运行的第二步需要操作的部分
 	Mat currentStartIndex,currentEndIndex;
@@ -117,6 +122,7 @@ public:
 	//Abstraction Model Part
 	int sum;					//统计有运动序列的帧的数量  &  运动提取的阈值
 	int currentLength,tempLength;		//
+	indexReplay replay;
 
 	//***    GPU    ***//
 	gpu::MOG2_GPU gpumog;				//调用混合高斯模型的类
@@ -205,4 +211,8 @@ public:
 	void setFilter(vector<bool>& filter, Rect& rec, int size);
 	//split The loading object process & The stitching process
 	void postCompound(int& testcount, int offset, indexReplay& replay);
+
+	//thread
+	void thread_load();
+	void thread_compound();
 };
