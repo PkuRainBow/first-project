@@ -94,3 +94,9 @@ void UserVideoAbstraction::UserGetKeyFrame(string filepath, int frameCount){
 void UserVideoAbstraction::UsersetTimeTag(bool timetag){
 	userVB->useTimeFlag=timetag;
 }
+
+void UserVideoAbstraction::xincoder_UsersetcompoundNum(int compoundNum)
+{
+	userVB->motionToCompound=compoundNum;
+	cout<<"xincoder_疏密参数设置成功，当前为"<<compoundNum<<"个"<<endl;
+}

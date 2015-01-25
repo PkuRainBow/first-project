@@ -17,6 +17,9 @@
 #define SINAGLE_MIN_AREA 200 //设置单个画面上凸包的最小阈值
 #define MIN_AREA_RATE 0.001  //设置单个画面上所有凸包面积之和占比的最小阈值
 
+UserVideoAbstraction* user;
+int xincoder_CompoundCount=8;
+
 //declaration
 extern int readFrameLog(string logname);
 extern void readAreaLog(string logname, int &base_x, int &base_y, int& base_w, int& base_h);
@@ -157,7 +160,7 @@ void mouseRecover(int mouseEvent,int x,int y,int flags,void* param)
 //test=3: you can replay the seleted object's event full process
 //test=4: you can view 9 snip-shots of the original video 
 /*****************************************************************/
-void testmultithread(string inputpath, string videoname, string midname, string outputname, int frameCount, int CompoundCount, int stage, bool readlog){
+void testmultithread(string inputpath, string videoname, string midname, string outputname, int frameCount, int stage, bool readlog){
 	time_t start_time,end_time;
 	start_time=time(NULL);
 	testVideoName=videoname;
@@ -194,7 +197,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	LOG(INFO)<<videoname<<" scale = "<<scale<<endl;
 
 	//create the VideoAbstraction Object and intialize the GPU setting and related threshold ...
-	UserVideoAbstraction* user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
+	user=new UserVideoAbstraction((char*)path.data(), (char*)out_path.data(), (char*)log_path.data(), (char*)config_path.data(),
 														(char*)index_path.data(), (char*)videoname.data(), (char*)midname.data(), scale);
 	user->UsersetGpu(false);
 	user->UsersetSingleMinArea(SINAGLE_MIN_AREA/(scale*scale));
@@ -269,7 +272,7 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 		else
 			frCount=frameCount;
 		//excute the compound step to compound the final output video ...
-		user->Usercompound(CompoundCount, (char*)t3.data(), frCount);
+		user->Usercompound(xincoder_CompoundCount, (char*)t3.data(), frCount);
 		user->UserfreeObject();
 	}
 
@@ -357,6 +360,18 @@ void testmultithread(string inputpath, string videoname, string midname, string 
 	ff_time.close();
 }
 
+void xincoder_thread()
+{
+	int load_number=0;
+	while (cin>>load_number)
+	{
+		cout<<"输入个数为："<<load_number<<endl;
+		user->xincoder_UsersetcompoundNum(load_number);
+		xincoder_CompoundCount=load_number;
+
+	}
+}
+
 int main(){
 	//cout<<"Please input your video path (like C:/TongHaoTestVideo/)"<<endl;
 	//string testpath, filename, configname, resultname;
@@ -399,8 +414,12 @@ int main(){
 	string testset3[] = {"M2U00063.avi", "M2U00064.avi", "M2U00066.avi", "M2U00067.avi", "M2U00068.avi", "M2U00s069.avi", 
 						"MVI_5612.avi","20111201_170301.avi", "20111202_101331.avi", "20111202_082711.avi", 
 						"MVI_5613.avi","che 001.avi"};
-	string testset4[] = { "shitang5.avi", "M2U00067.avi", "LOD_CIF_HQ_4_2.avi", "testvideo.avi", "juminxiaoqu.avi", "loumenkou.avi", "road.avi","20111202_082713.avi"};
-	string testset2[] = {"M2U00069.avi", "M2U00064.avi", "M2U00066.avi", "M2U00067.avi", "M2U00068.avi", "M2U00069.avi", "MVI_5612.avi","MVI_5613.avi"};
+	string testset4[] = { "shitang5.avi", "M2U00067.avi", "LOD_CIF_HQ_4_2.avi",  "juminxiaoqu.avi", "loumenkou.avi", "road.avi","20111202_082713.avi"};
+	string testset2[] = {"testvideo.avi", "M2U00069.avi", "20111201_170301.avi", "20111202_082711.avi", "20111202_101331.avi", "M2U00064.avi", "M2U00066.avi", "M2U00067.avi", "M2U00068.avi", "M2U00069.avi", "MVI_5612.avi","MVI_5613.avi"};
+	
+	boost::thread new_thread(xincoder_thread);
+	new_thread.start_thread();
+	
 	for(int i=0; i<1; i++){
 	//for(int i=0; i<testset2->size()-1; i++){
 		string result_name="new_result_"+testset2[i];
@@ -412,9 +431,9 @@ int main(){
 		}
 		//boost::thread test1(testmultithread,"F:/TongHaoTest4/", testset2[i], config_name, result_name, 0, 8, 1, true);
 		//test1.join();
-		//testmultithread("F:/TongHaoTest3/", testset2[i], config_name, result_name, 0, 8, 1, true);
-		//testmultithread("F:/TongHaoTest3/", testset2[i], config_name, result_name, 0, 8, 2, true);
-		testmultithread("F:/TongHaoTest3/", testset2[i], config_name, result_name, 0, 8, 3, true);
+		//testmultithread("F:/TongHaoTest3/", testset2[i], config_name, result_name, 8,  1, true);
+		testmultithread("F:/TongHaoTest3/", testset2[i], config_name, result_name, 5, 2, true);
+		testmultithread("F:/TongHaoTest3/", testset2[i], config_name, result_name, 5, 3, true);
 	}
 	//for(int i=0; i<testset1->size(); i++){	
 	//	string result_name="result_"+testset1[i];
@@ -423,6 +442,7 @@ int main(){
 	//	test1.join();
 	//	cout<<"finished..."<<endl;
 	//}
+	waitKey(0);
 	return 0;
 }
 

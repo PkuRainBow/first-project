@@ -84,6 +84,7 @@ public:
 	vector<ObjectCube> tempToCopy;      //存储视角发生移动的场景，直接复制不参与到复制运动序列中
 	int tempToCompoundNum;
 	int tempToCopyNum;
+	int tmaxlength;
 	int offset;
 	//mutex
 	boost::mutex mutex_load, mutex_compound;
@@ -161,10 +162,10 @@ public:
 	int computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int shift,string path="");		// Returns:  int 返回在当前时间偏移下两个事件的冲突像素点的个数  
 																					//obj1：事件1 obj2:事件2 shift 事件2相对事件1的时间偏移  string path 事件存储目录
 	int graphCut(vector<int> &shift,vector<ObjectCube> &ob,int step=5);						//给定运动序列，使用 graph_cut 算法计算其时间偏移
-	int ComponentLable(Mat& fg_mask, vector<Rect>& vComponents_out, int area_threshold);
-	bool isSimilarRects(const Rect& r1, const Rect& r2, double eps);
-	double rectsOverlapAreaRate(const Rect& r1, const Rect& r2);
-	static void on_mouse(int event,int x,int y,int flags,void* param);
+	//int ComponentLable(Mat& fg_mask, vector<Rect>& vComponents_out, int area_threshold);
+	//bool isSimilarRects(const Rect& r1, const Rect& r2, double eps);
+	//double rectsOverlapAreaRate(const Rect& r1, const Rect& r2);
+	//static void on_mouse(int event,int x,int y,int flags,void* param);
 	
 	void saveObjectCube(ObjectCube &ob);													//存放运动序列到本地
 	int saveRemainObject();															//保存多出来的运动序列信息并返回包含有运动序列的图像帧的个数 赋值给 ObjectCubeNumber

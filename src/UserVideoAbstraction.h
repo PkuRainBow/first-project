@@ -35,4 +35,6 @@ public:
 	__declspec(dllexport) void UsersetSingleMinArea(float area);
 	__declspec(dllexport) void UsersetMinArea(float area);
 	__declspec(dllexport) void UserGetKeyFrame(string filepath, int frameCount);
+
+	__declspec(dllexport) void xincoder_UsersetcompoundNum(int compoundNum);
 };

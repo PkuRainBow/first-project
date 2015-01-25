@@ -6,7 +6,10 @@
 //Update: 2014/01/07
 //****************************************
 #include "VideoAbstraction.h"
-//
+
+/*
+*  自定义的拷贝构造函数
+*/
 VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log_path, string config_path, string index_path, string videoname, string midname, float size):replay(inputpath+"Replay/"+videoname, inputpath+"Config/"+midname){
 	init();
 	scaleSize=size;
@@ -27,6 +30,9 @@ VideoAbstraction::VideoAbstraction(string inputpath, string out_path, string log
 	useROI=false;
 }
 
+/*
+*	构造函数调用的init()操作
+*/
 void VideoAbstraction::init(){
 	objectarea=60;
 	useGpu=true;
@@ -51,7 +57,10 @@ void VideoAbstraction::init(){
 	flag=false;
 	useROI=false;
 }
-//
+
+/*
+*  自定义的强制释放内存的函数
+*/
 void VideoAbstraction::freeObject(){
 	videoCapture.~VideoCapture();
 	videoWriter.~VideoWriter();
@@ -65,6 +74,8 @@ void VideoAbstraction::freeObject(){
 	currentMask.release();	
 	vector<ObjectCube>().swap(partToCompound);
 	vector<ObjectCube>().swap(partToCopy);
+	vector<ObjectCube>().swap(tempToCompound);
+	vector<ObjectCube>().swap(tempToCopy);
 	vector<Mat>().swap(compoundResult);
 	vector<Mat>().swap(indexs);
 	vector<Mat>().swap(indexe);
@@ -72,19 +83,27 @@ void VideoAbstraction::freeObject(){
 	vector<int>().swap(frame_end); 
 }
 
+/*
+*  自定义的int转变为string
+*/
 string VideoAbstraction::int2string(int _Val){
 	char _Buf[100];
 	sprintf(_Buf, "%d", _Val);
 	return (string(_Buf));
 }
 
+/*
+*  对于传入的图片进行后处理可以消除一些额外的噪声影响
+*/
 void VideoAbstraction::postProc(Mat& frame){
 	blur(frame,frame,Size(25,25)); //用于去除噪声 平滑图像 blur（inputArray, outputArray, Size）
 	threshold(frame,frame,100,255,THRESH_BINARY);	//对于数组元素进行固定阈值的操作  参数列表：(输入图像，目标图像，阈值，最大的二值value--8对应255, threshold类型)
 	dilate(frame,frame,Mat());// 用于膨胀图像 参数列表：(输入图像，目标图像，用于膨胀的结构元素---若为null-则使用3*3的结构元素，膨胀的次数)
 }
 
-
+/*
+*  自定义的预处理，提前过滤掉较小的噪声避免小噪声在后面膨胀操作后连通成一个大的凸包
+*/
 void xincoder_ConnectedComponents(int frameindex, Mat &mask,int thres){  
 	Mat ele(2,4,CV_8U,Scalar(1));
 	erode(mask,mask,ele);// 默认时，ele 为 cv::Mat() 形式  参数扩展（image， eroded, structure, cv::Point(-1,-1,), 3） 
@@ -113,6 +132,9 @@ void xincoder_ConnectedComponents(int frameindex, Mat &mask,int thres){
 	vector<vector<Point>>().swap(newcontors);
 }
 
+/*
+*  对于传入的求连通分支
+*/
 void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){  
 	Mat ele(2,4,CV_8U,Scalar(1));
 	erode(mask,mask,ele);// 默认时，ele 为 cv::Mat() 形式  参数扩展（image， eroded, structure, cv::Point(-1,-1,), 3） 
@@ -143,6 +165,9 @@ void VideoAbstraction::ConnectedComponents(int frameindex, Mat &mask,int thres){
 	vector<vector<Point>>().swap(newcontors);
 }
 
+/*
+*   将mat变成vector<bool> 凸包内全部是1 其他全部是0
+*/
 vector<bool> matToVector(Mat &input){
 	int step=input.step,step1=input.elemSize();
 	uchar* indata=input.data;
@@ -158,6 +183,9 @@ vector<bool> matToVector(Mat &input){
 	return ret;
 }
 
+/*
+* 将0,1的vector<bool>变成 255/0 组成的mat
+*/
 Mat vectorToMat(vector<bool> &input,int row,int col){
 	Mat re(row,col,CV_8U,Scalar::all(0));
 	int step=re.step,step1=re.elemSize();
@@ -168,8 +196,10 @@ Mat vectorToMat(vector<bool> &input,int row,int col){
 	return re;
 }
 
+/*
+*   将input1 和 input2 根据conflictMask的组成来进行虚化或者直接拼接的处理 back是背景的mask,start-end是起始的帧号
+*/
 void VideoAbstraction::stitch(Mat& conflictMask, Mat &input1,Mat &input2,Mat &output,Mat &back,Mat &mask,int start,int end, int frameno){
-//void VideoAbstraction::stitch(Mat &input1,Mat &input2,Mat &output,Mat &back,Mat &mask,int start,int end, vector<vector<Point>>& re_contours, bool& flag){
 	int step10=input1.step,step11=input1.elemSize();
 	int step20=input2.step,step21=input2.elemSize();
 	int step30=output.step,step31=output.elemSize();
@@ -220,7 +250,6 @@ void VideoAbstraction::stitch(Mat& conflictMask, Mat &input1,Mat &input2,Mat &ou
 	end = end/framePerSecond;
 	vector<vector<Point>> m_contours;
 	vector<Point> info(0,0);
-
 	if(useTimeFlag)
 	{
 		findContours(mask,m_contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
@@ -228,205 +257,16 @@ void VideoAbstraction::stitch(Mat& conflictMask, Mat &input1,Mat &input2,Mat &ou
 	}
 }
 
-int VideoAbstraction::ComponentLable(Mat& fg_mask, vector<Rect>& vComponents_out, int area_threshold)
-{
-	const double	MAXASPECTRATIO =2;
-	const double	MINASPECTRATIO =0.5;
-	const double	FILLRATIO	=0.4;
-	const int       DISTBTWNPART =81;
-	//const int       MINRECTSIZE = hog_des.winSize.height * hog_des.winSize.width;
-	const int		AREATHRESHOLD = area_threshold;
-	double similar_rects_eps = 0.7;
-
-	const int xdir[8]={-1,0,0,1,1,1,-1,-1};
-	const int ydir[8]={0,-1,1,0,1,-1,-1,1};
-	const int HEIGHT = fg_mask.rows;
-	const int WIDTH = fg_mask.cols;
-
-#define p_lable(x,y)    (p_lable[(y)*(WIDTH)+(x)])
-
-	int x,y,m;
-	int cur_pos=0;//start from 0
-	int tail_pos=0;
-	int cur_x, cur_y;
-	int left_pos, right_pos, up_pos, bottom_pos;
-	//CvRect rect;
-	int lable_count=0;
-	int* p_x=NULL;
-	int* p_y=NULL;
-	int* p_lable=NULL;
-	//	int RectSize ;
-	//	double FillRatio ;
-	//	double AspectRatio ;
-	int rWidth;
-	int rHeight;
-
-	p_x = new int[HEIGHT *WIDTH ];
-	p_y = new int[HEIGHT*WIDTH ];
-	p_lable = new int[HEIGHT*WIDTH ];
-
-	memset(p_lable,0,WIDTH*HEIGHT*sizeof(int));
-	for(y=0;y<HEIGHT; y++)//y
-	{
-		for(x=0;x<WIDTH;x++)//x
-		{
-			if( p_lable(x,y)!=0 || fg_mask.at<uchar>(y,x) != 255 ) //注意只认可255为前景
-				continue;
-			lable_count++;	//begin a new component
-			p_lable(x,y) = lable_count;
-			cur_pos = 0;
-			tail_pos = 0;
-			p_x[tail_pos] = x;
-			p_y[tail_pos] = y;
-			tail_pos++;
-			left_pos = x; right_pos = x;
-			up_pos = y; bottom_pos = y;
-
-			while(cur_pos!=tail_pos)
-			{
-				cur_x = p_x[cur_pos];
-				cur_y = p_y[cur_pos];
-				cur_pos++;
-				for(m=0; m<8; m++)
-				{
-					if( (cur_y+ydir[m])>=0 && (cur_y+ydir[m])<HEIGHT &&
-						(cur_x+xdir[m])>=0 && (cur_x+xdir[m])<WIDTH &&
-						fg_mask.at<uchar>(cur_y+ydir[m],cur_x+xdir[m])!=0 &&
-						p_lable(cur_x+xdir[m],cur_y+ydir[m])==0 )
-					{
-						p_x[tail_pos] = cur_x+xdir[m];
-						p_y[tail_pos] = cur_y+ydir[m];
-						tail_pos++;
-						p_lable(cur_x+xdir[m], cur_y+ydir[m]) = lable_count;
-
-						//更新巨型框的坐标（topLeft,bottomRight）
-						if(xdir[m]==1 && cur_x+1 > right_pos )
-							right_pos = cur_x+1;
-						if(xdir[m]==-1 && cur_x-1 < left_pos )
-							left_pos = cur_x-1;
-						if(ydir[m]==1 && cur_y+1 > bottom_pos)
-							bottom_pos = cur_y+1;
-						if(ydir[m]==-1 && cur_y-1 < up_pos)
-							up_pos = cur_y -1;							
-					}
-				}
-			}
-
-			rWidth=CV_IABS((right_pos-left_pos));
-			rHeight=CV_IABS(bottom_pos-up_pos);
-			//RectSize =  rWidth*rHeight;
-			//FillRatio = (double)cur_pos/(double)RectSize;
-			//AspectRatio = (double)rWidth/(double)rHeight;
-
-			if (
-				cur_pos<AREATHRESHOLD /*|| 
-									  AspectRatio>MAXASPECTRATIO || 
-									  AspectRatio<MINASPECTRATIO ||
-									  FillRatio<FILLRATIO*/
-									  )
-			{
-				lable_count--;
-				for (int i=0;i<tail_pos;i++)
-				{
-					fg_mask.at<uchar>(p_y[i],p_x[i])=0;
-				}
-			}
-			else
-			{
-				//Rect r(left_pos,up_pos,rWidth,rHeight);
-				Rect r;
-				r.x = max(left_pos-cvRound(rWidth * 0.2) ,0);
-				r.width = min(cvRound(rWidth * 1.2), WIDTH);
-				r.y = max(up_pos-cvRound(rHeight * 0.2), 0);
-				r.height = min(cvRound(rHeight * 1.2), HEIGHT);
-
-				if (r.width < 64)
-				{
-					r.width = 64; 
-				}
-				if (r.height < 128)
-				{
-					r.height = 128;
-				}
-				if (r.x+r.width > WIDTH)
-				{
-					r.x = WIDTH - r.width;
-				}
-				if (r.y+r.height > HEIGHT)
-				{
-					r.y = HEIGHT - r.height;
-				}
-
-				bool is_similar_found = false;
-				for (vector<Rect>::iterator itr = vComponents_out.begin(); itr != vComponents_out.end(); ++itr)
-				{
-					if (isSimilarRects(r, *itr, similar_rects_eps))
-					{
-						is_similar_found = true;
-						lable_count--;
-						for (int i=0;i<tail_pos;i++)
-						{
-							fg_mask.at<uchar>(p_y[i],p_x[i])=0;
-						}
-						break;
-					}
-				}
-				if (!is_similar_found)
-				{
-					vComponents_out.push_back(r);
-				}
-			}
-		}
-	}
-	// TODO: 矩形框之间不能有交集，如果有，则合并
-
-	if (p_x!=NULL)
-	{
-		delete []p_x;
-		p_x = NULL;
-	}
-
-	if (p_y!=NULL)
-	{
-		delete []p_y;
-		p_y = NULL;
-	}
-
-	if (p_lable!=NULL)
-	{
-		delete []p_lable;
-		p_lable = NULL;
-	}
-
-	return 0;
-}
-
-bool VideoAbstraction::isSimilarRects(const Rect& r1, const Rect& r2, double eps)
-{
-	return rectsOverlapAreaRate(r1, r2) > eps;
-}
-
-double VideoAbstraction::rectsOverlapAreaRate(const Rect& r1, const Rect& r2)
-{
-	CvRect cr1 = cvRect(r1.x, r1.y, r1.width, r1.height);
-	CvRect cr2 = cvRect(r2.x, r2.y, r2.width, r2.height);
-	CvRect cr = cvMaxRect(&cr1, &cr2);//返回包含cr1 和 cr2 2个矩阵的最小矩阵信息 然后求解重叠部分的面积
-	int w = cr1.width + cr2.width - cr.width;
-	int h = cr1.height + cr2.height - cr.height;
-	if(w<=0||h<=0)
-		return 0;
-	else
-		return max(double(w*h)/double(cr1.height*cr1.width), double(w * h)/double(cr2.height * cr2.width));
-}
-
-double VideoAbstraction::random(double start, double end){
-	return start+(end-start)*rand()/(RAND_MAX + 1.0);
-}
-
+/*
+*	计算2个mat之间的冲突程度
+*/
 int VideoAbstraction::computeMaskCollision(Mat &input1,Mat &input2){
 	return countNonZero(input1&input2);
 }
 
+/*
+*	计算2个存储为vector格式的mat的冲突程度
+*/
 int VideoAbstraction::computeMaskCollision(vector<bool> &input1,vector<bool> &input2){
 	int ret=0;
 	if(input1.size()!=input2.size())
@@ -441,6 +281,9 @@ int VideoAbstraction::computeMaskCollision(vector<bool> &input1,vector<bool> &in
 	return ret;
 }
 
+/*
+*	计算2个运动序列的冲突数
+*/
 int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int shift,string path){
 	int collision=0;
 	int as,bs;
@@ -469,19 +312,24 @@ int VideoAbstraction::computeObjectCollision(ObjectCube &ob1,ObjectCube &ob2,int
 	return collision;
 }
 
-
-void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前背景分离函数
+/*
+*	核心部分：前背景分离并将分离出来的前景保存成指定格式的中间文件
+*/
+void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){
+	//调整处理的mat的大小
 	if(scaleSize > 1)
 	{
 		resize(currentFrame, currentFrame, Size(frameWidth,frameHeight));
 	}
-	if(50==frameIndex)								//如果中间文件原来已经存在，则执行清空操作
+	//如果中间文件原来已经存在，则执行清空操作
+	if(10==frameIndex)								
 	{
 		ofstream file_flush(Configpath+MidName, ios::trunc);
 	}
-	if(frameIndex <= 50)
-	{										   //初始化混合高斯 取前50帧图像来更新背景信息  提示：取值50仅供参考，并非必须是50
-		if(useGpu)
+	//初始化混合高斯 取前10帧图像来更新背景信息  提示：取值10仅供参考，并非必须是10 因此我们推荐处理的视频长度控制在1分钟以上
+	if(frameIndex <= 10)
+	{		
+		if(useGpu) //使用GPU
 		{
 			//gpu module
 			gpuFrame.upload(currentFrame);
@@ -489,7 +337,7 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 			gpumog.getBackgroundImage(gpuBackgroundImg);
 			gpuBackgroundImg.download(backgroundImage);
 		}
-		else
+		else     //使用CPU
 		{
 			currentFrame.copyTo(gFrame);				//复制要处理的图像帧到 gFrame 中
 			mog(gFrame,gForegroundMask,LEARNING_RATE);	//更新背景模型并且返回前景信息   参数解释： （下一个视频帧， 输出的前景帧信息， 学习速率）
@@ -502,10 +350,9 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 		}
 		imwrite(InputName+"background.jpg",backgroundImage);
 	}
-
 	else
 	{										//50帧之后的图像需要正常处理
-		if(frameIndex%2==0)
+		if(frameIndex%3==0)
 		{						//更新前背景信息的频率，表示每5帧做一次前背景分离
 			if(useGpu)
 			{
@@ -513,7 +360,6 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 				gpuFrame.upload(currentFrame);
 				gpumog(gpuFrame,gpuForegroundMask,LEARNING_RATE);
 				gpuForegroundMask.download(currentMask);
-
 				//xincoder_start
 				xincoder_ConnectedComponents(frameIndex,currentMask,10);
 				dilate(gForegroundMask,gForegroundMask,cv::Mat());
@@ -529,25 +375,24 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 				//xincoder
 				gForegroundMask.copyTo(currentMask);		//复制运动的凸包序列到 currentMask 中
 			}
-			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉 （取值50仅供参考）
-			//freopen("exe.txt","a",stdout);
+			ConnectedComponents(frameIndex,currentMask, objectarea);		//计算当前前景信息中的凸包信息，存储在 currentMask 面积大于objectarea的是有效的运动物体，否则过滤掉
 			sum=countNonZero(currentMask);			//计算凸包中非0个数
 			if((double)sum/(frameHeight*frameWidth)>thres)
-			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
+			{							//前景包含的点的个数和原始视频帧大小的比值大于0.001，则令flag=true
 				flag=true;
 			}
 			if(useROI && (double)sum/((rectROI.width*rectROI.height)/(scaleSize*scaleSize))>thres)
-			{							//前景包含的点的个数大于 1000 个 认为是有意义的运动序列（取值1000仅供参考）
-				//cout<<"points number : "<<sum<<endl;
+			{						  //使用感兴趣区域勾选的时候前景包含的点的个数和原始视频帧勾选区域的大小的比值大于0.001，则令flag=true
 				flag=true;
 			}
 		}
-		if(flag)
-		{							   //判断当前的图像帧是否包含有意义的运动序列信息
+		//处理包含有运动序列的帧
+		if(flag)	
+		{							   
 			currentObject.objectMask.push_back(matToVector(currentMask));					//将当前帧添加到运动序列中
 			if(currentObject.start<0) currentObject.start=frameIndex;
 			//can not abandon any object sequence including very long event ...
-			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*60) //maxLengthToSplit ~ 1000frames ~ 40s ~ 60*40s ~ 40min
+			if(currentObject.start>0 && frameIndex-currentObject.start>maxLengthToSpilt*60)  //maxLengthToSplit ~ 1000frames ~ 40s ~ 60*40s ~ 40min
 			{
 				currentObject.objectMask.clear();
 				currentObject.start=-1;
@@ -609,7 +454,6 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 							vector<vector<bool>>().swap(temp.objectMask);
 							detectedMotion--;
 						}
-
 						else
 						{														//事件正常长度，直接添加到运动序列中
 							maxLength=max(currentLength,maxLength);
@@ -649,6 +493,9 @@ void VideoAbstraction::Abstraction(Mat& currentFrame, int frameIndex){	  //前�
 	}
 }
 
+/*
+*	保存运动序列到中间文件中
+*/
 void VideoAbstraction::saveObjectCube(ObjectCube &ob){			//保存运动的凸包序列的函数
 	frame_start.push_back(ob.start);						//保存凸包的开始帧号
 	frame_end.push_back(ob.end);							//保存凸包的结束帧号
@@ -665,6 +512,9 @@ void VideoAbstraction::saveObjectCube(ObjectCube &ob){			//保存运动的凸包
 	ff.close();
 }
 
+/*
+*	保存配置信息到中间文件中
+*/
 void VideoAbstraction::saveConfigInfo(){						//保存所有凸包运动序列的开始和结束帧信息
 	ofstream ff(Configpath+MidName, ofstream::app);
 	int size = frame_start.size();
@@ -677,6 +527,9 @@ void VideoAbstraction::saveConfigInfo(){						//保存所有凸包运动序列�
 	ff.close();
 }
 
+/*
+*	将中间文件中指定偏移量的导入到contours中
+*/
 string VideoAbstraction::loadObjectCube(int bias, vector<vector<Point>>& contours){ 
 	ifstream file(Configpath+MidName);
 	string temp;
@@ -688,12 +541,15 @@ string VideoAbstraction::loadObjectCube(int bias, vector<vector<Point>>& contour
 	return temp;
 }
 
-
+/*
+*	将中间文件中指定偏移量的运动序列导入内存中
+*/
 void VideoAbstraction::loadObjectCube(int& currentIndex){
 	vector<ObjectCube>().swap(tempToCompound);
 	vector<ObjectCube>().swap(tempToCopy);
 	tempToCompoundNum=0;
 	tempToCopyNum=0;
+	tmaxlength=0;
 	ifstream file(Configpath+MidName);
 	string temp;
 	/*
@@ -734,8 +590,6 @@ void VideoAbstraction::loadObjectCube(int& currentIndex){
 			ob.objectMask.push_back(matToVector(bb));	
 		}
 		vector<vector<Point>>().swap(contors);
-		curMaxLength=max(length,curMaxLength);
-		
 		//view change
 		if(changeSceneNum > 10)
 		{
@@ -748,14 +602,20 @@ void VideoAbstraction::loadObjectCube(int& currentIndex){
 		else
 		{
 			//cout<<"put the event into the tempToCompound ... "<<endl;
+			tmaxlength=max(length,tmaxlength);
+			//curMaxLength=max(length, curMaxLength);
 			tempToCompound.push_back(ob);
 			vector<vector<bool>>().swap(ob.objectMask);
 			tempToCompoundNum++;
 		}
 	}
+    //LOG(INFO)<<tempToCompoundNum<<endl;
 	//
 }
 
+/*
+*  重载的导入指定起始帧之间的运动序列的 loadObjectCube() 函数
+*/
 void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指定事件序列号范围内的运动帧导入 partToCompound 和 partToCopy 中
 	partToCompoundNum=0;
 	partToCopyNum=0;
@@ -810,6 +670,9 @@ void VideoAbstraction::loadObjectCube(int index_start, int index_end){ //将指�
 	file.close();
 }
 
+/*
+*
+*/
 void  VideoAbstraction::LoadConfigInfo(){		//不能分阶段处理 -- 读取中间文件中的运动起始信息
 	EventNum=0;
 	ifstream file(Configpath+MidName);
@@ -832,6 +695,9 @@ void  VideoAbstraction::LoadConfigInfo(){		//不能分阶段处理 -- 读取中�
 	file.close();
 }
 
+/*
+*
+*/
 void  VideoAbstraction::LoadConfigInfo(int frameCountUsed){  //用于分阶段处理 ---  需要传入有效帧的帧数信息
 	this->ObjectCubeNumber=frameCountUsed;
 	this->EventNum=0;
@@ -855,7 +721,9 @@ void  VideoAbstraction::LoadConfigInfo(int frameCountUsed){  //用于分阶段�
 	file.close();
 }
 
-
+/*
+*
+*/
 int VideoAbstraction::graphCut(vector<int> &shift,vector<ObjectCube> &ob,int step/* =5 */){  //计算所有运动序列的最佳偏移序列组合
 
 	int n=ob.size(),A,B,C,D,label,collision;
@@ -978,10 +846,12 @@ void VideoAbstraction::thread_load()
 		LOG(INFO)<<"*** 第"<<loadSeqNumber++<<"次 ***"<<endl;
 		LOG(INFO)<<"load the object cube to compound to the memory ..."<<endl;
 		maxLength=0;
-		curMaxLength=0;
 		//
+		cout<<"start  load  ......."<<endl;
 		loadObjectCube(currentIndex);
+		cout<<"end    load  ........"<<endl;
 		mutex_load.lock();
+		curMaxLength=tmaxlength;
 		offset=temp;
 		partToCompound.swap(tempToCompound);
 		partToCompoundNum=tempToCompoundNum;
@@ -1110,10 +980,13 @@ void VideoAbstraction::postCompound(int& testcount, int offset, indexReplay& rep
 			}
 			rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
 				Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize), CV_RGB(0,255,0),2);
-			videoWriter.write(currentResultFrame);
+			
 			//
-			//imshow("compound",currentResultFrame);
-			//waitKey(1);
+			imshow("compound",currentResultFrame);
+			waitKey(1);
+			videoWriter.write(currentResultFrame);
+			
+			
 		}
 		//deal with the scene change cases ...
 		if(partToCopyNum>0)
@@ -1147,18 +1020,18 @@ void VideoAbstraction::postCompound(int& testcount, int offset, indexReplay& rep
 					rectangle(currentResultFrame,Point(rectROI.x/scaleSize,rectROI.y/scaleSize),
 						Point((rectROI.x+rectROI.width)/scaleSize,(rectROI.y+rectROI.height)/scaleSize),CV_RGB(0,255,0),2);
 					testcount++;
+					//
+					imshow("compound",currentResultFrame);
+					waitKey(1);
+
 					videoWriter.write(currentResultFrame);
+					
 				}
 			}
 		}
 		currentFrame.release();
 		currentResultFrame.release();
 }
-
-
-
-
-
 
 void VideoAbstraction::setVideoFormat(string Format){	//保存视频的格式
 	videoFormat = Format;
